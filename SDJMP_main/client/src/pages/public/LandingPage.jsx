@@ -13,71 +13,15 @@ import {
   BarChart3,
   Shield,
 } from 'lucide-react'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
-const stats = [
-  { value: '10,000+', label: 'Active Students', icon: GraduationCap },
-  { value: '500+', label: 'Partner Companies', icon: Building2 },
-  { value: '5,000+', label: 'Jobs Posted', icon: Briefcase },
-  { value: '85%', label: 'Placement Rate', icon: TrendingUp },
-]
-
-const features = [
-  {
-    icon: Target,
-    title: 'Skill-Based Matching',
-    description: 'Our AI algorithm matches you with jobs based on your actual skills, not just keywords.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Skill Assessments',
-    description: 'Take assessments to validate your skills and stand out to employers.',
-  },
-  {
-    icon: Zap,
-    title: 'Real-Time Updates',
-    description: 'Get instant notifications when you match with new opportunities.',
-  },
-  {
-    icon: Shield,
-    title: 'Verified Employers',
-    description: 'All xemployers are verified to ensure legitimate job opportunities.',
-  },
-]
-
-const testimonials = [
-  {
-    quote: "SkillMatch helped me land my dream job at a top tech company. The skill assessments really helped showcase my abilities.",
-    author: "Sarah Chen",
-    role: "Software Engineer at TechCorp",
-    avatar: "SC",
-  },
-  {
-    quote: "As a recruiter, SkillMatch has transformed how we find talent. The quality of candidates is exceptional.",
-    author: "Michael Brown",
-    role: "HR Manager at InnovateTech",
-    avatar: "MB",
-  },
-  {
-    quote: "The platform made my job search so much easier. I received interview calls within days of creating my profile.",
-    author: "Emily Rodriguez",
-    role: "Data Analyst at DataDriven",
-    avatar: "ER",
-  },
-]
-
-const topSkills = [
-  { name: 'React', demand: 'High', growth: '+25%' },
-  { name: 'Python', demand: 'High', growth: '+30%' },
-  { name: 'Node.js', demand: 'High', growth: '+20%' },
-  { name: 'TypeScript', demand: 'High', growth: '+35%' },
-  { name: 'AWS', demand: 'Medium', growth: '+18%' },
-  { name: 'Data Science', demand: 'High', growth: '+40%' },
-]
+import { landingStats as stats, features, testimonials, topSkills } from '@/config/content'
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuth()
+
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
@@ -86,7 +30,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center text-center gap-8 max-w-3xl mx-auto animate-fade-up">
             <Badge variant="secondary" className="gap-1">
               <Zap className="h-3 w-3" />
-              AI-Powered Job Matching
+              Skill-Based Discovery
             </Badge>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-balance">
@@ -96,31 +40,22 @@ export default function LandingPage() {
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl text-pretty">
-              SkillMatch Pro uses intelligent skill-based matching to connect talented students 
-              with top employers. Build your profile, showcase your skills, and land your dream job.
+              SkillMatch connects talented students 
+              with top employers through skill-based matching. Build your profile, showcase your skills, and land your dream job.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="animate-pulse-scale" asChild>
-                <Link to="/register">
-                  Get Started Free
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              {!isAuthenticated && (
+                <Button size="lg" className="animate-pulse-scale" asChild>
+                  <Link to="/register">
+                    Get Started
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+              <Button size="lg" variant={isAuthenticated ? "default" : "outline"} asChild>
                 <Link to="/jobs">Browse Jobs</Link>
               </Button>
-            </div>
-
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                Free to use
-              </div>
-              <div className="flex items-center gap-1">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                No credit card required
-              </div>
             </div>
           </div>
         </div>
@@ -202,7 +137,7 @@ export default function LandingPage() {
               {
                 step: '03',
                 title: 'Get Matched',
-                description: 'Our AI matches you with relevant jobs based on your skills and preferences.',
+                description: 'Our algorithm connects you with relevant jobs based on your skills and preferences.',
                 icon: Target,
               },
             ].map((item) => {
@@ -308,35 +243,37 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 md:py-28">
-        <div className="container px-4 md:px-6">
-          <Card className="bg-primary text-primary-foreground overflow-hidden">
-            <CardContent className="p-8 md:p-12 text-center">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Ready to Find Your Perfect Match?
-              </h2>
-              <p className="text-primary-foreground/80 max-w-2xl mx-auto mb-8">
-                Join thousands of students and employers who are already using SkillMatch 
-                to connect skills with opportunities.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" variant="secondary" asChild>
-                  <Link to="/register">
-                    <GraduationCap className="mr-2 h-4 w-4" />
-                    I am a Student
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" className="bg-transparent border-primary-foreground/20 hover:bg-primary-foreground/10" asChild>
-                  <Link to="/register">
-                    <Building2 className="mr-2 h-4 w-4" />
-                    I am an Employer
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+      {!isAuthenticated && (
+        <section className="py-20 md:py-28">
+          <div className="container px-4 md:px-6">
+            <Card className="bg-primary text-primary-foreground overflow-hidden">
+              <CardContent className="p-8 md:p-12 text-center">
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                  Ready to Start Your Career Journey?
+                </h2>
+                <p className="text-primary-foreground/80 max-w-2xl mx-auto mb-8">
+                  Join thousands of students and employers who are already using SkillMatch 
+                  to connect skills with opportunities.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button size="lg" variant="secondary" asChild>
+                    <Link to="/register">
+                      <GraduationCap className="mr-2 h-4 w-4" />
+                      I am a Student
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" className="bg-transparent border-primary-foreground/20 hover:bg-primary-foreground/10" asChild>
+                    <Link to="/register">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      I am an Employer
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

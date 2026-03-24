@@ -41,6 +41,13 @@ const jobSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    skillRequirements: [
+      {
+        name: { type: String, required: true },
+        weight: { type: Number, default: 10 },
+        level: { type: String, default: 'Intermediate' }
+      }
+    ],
     requirements: {
       type: [String],
       default: [],

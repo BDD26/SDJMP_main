@@ -20,65 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-
-const values = [
-  {
-    icon: Target,
-    title: 'Precision Matching',
-    description: 'We believe in connecting the right talent with the right opportunities through data-driven matching.',
-  },
-  {
-    icon: Heart,
-    title: 'Student-First',
-    description: 'Students are at the heart of everything we do. We are committed to helping them succeed.',
-  },
-  {
-    icon: Lightbulb,
-    title: 'Innovation',
-    description: 'We continuously improve our platform with cutting-edge technology and user feedback.',
-  },
-  {
-    icon: Users,
-    title: 'Community',
-    description: 'We foster a community of learners, employers, and educators working together.',
-  },
-]
-
-const team = [
-  {
-    name: 'Dr. Sarah Johnson',
-    role: 'CEO & Co-Founder',
-    bio: 'Former Google engineer with 15+ years in EdTech',
-    avatar: 'SJ',
-  },
-  {
-    name: 'Michael Chen',
-    role: 'CTO & Co-Founder',
-    bio: 'Ex-Amazon, specializing in AI and ML systems',
-    avatar: 'MC',
-  },
-  {
-    name: 'Emily Rodriguez',
-    role: 'Head of Product',
-    bio: '10+ years building products for students and educators',
-    avatar: 'ER',
-  },
-  {
-    name: 'David Kim',
-    role: 'Head of Partnerships',
-    bio: 'Previously led university relations at LinkedIn',
-    avatar: 'DK',
-  },
-]
-
-const milestones = [
-  { year: '2020', title: 'Founded', description: 'SkillMatch was born from a vision to revolutionize student-employer connections.' },
-  { year: '2021', title: 'First 1000 Users', description: 'Reached our first milestone of 1000 registered students.' },
-  { year: '2022', title: 'Series A', description: 'Raised $10M to expand our platform and team.' },
-  { year: '2023', title: '100+ Partners', description: 'Partnered with over 100 universities and 500 employers.' },
-  { year: '2024', title: 'AI Matching', description: 'Launched our revolutionary AI-powered skill matching engine.' },
-  { year: '2025', title: 'Global Expansion', description: 'Expanded to 20+ countries serving millions of students.' },
-]
+import { aboutValues as values, aboutTeam as team, aboutMilestones as milestones, contactInfo } from '@/config/content'
 
 export default function AboutPage() {
   return (
@@ -93,8 +35,8 @@ export default function AboutPage() {
               <span className="text-primary">Opportunity</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8">
-              SkillMatch Pro is on a mission to transform how students find jobs and how 
-              employers discover talent through intelligent skill-based matching.
+              SkillMatch is on a mission to transform how students find jobs and how 
+              employers discover talent through intelligent skill-based discovery.
             </p>
           </div>
         </div>
@@ -211,7 +153,7 @@ export default function AboutPage() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Meet Our Team</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              The passionate people behind SkillMatch Pro.
+              The passionate people behind SkillMatch.
             </p>
           </div>
 
@@ -258,7 +200,7 @@ export default function AboutPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Email</h3>
-                    <p className="text-muted-foreground">contact@skillmatch.pro</p>
+                    <p className="text-muted-foreground">{contactInfo.email}</p>
                   </div>
                 </div>
 
@@ -268,7 +210,7 @@ export default function AboutPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Phone</h3>
-                    <p className="text-muted-foreground">+1 (555) 123-4567</p>
+                    <p className="text-muted-foreground">{contactInfo.phone}</p>
                   </div>
                 </div>
 
@@ -278,9 +220,8 @@ export default function AboutPage() {
                   </div>
                   <div>
                     <h3 className="font-medium">Office</h3>
-                    <p className="text-muted-foreground">
-                      123 Innovation Drive<br />
-                      San Francisco, CA 94105
+                    <p className="text-muted-foreground whitespace-pre-line">
+                      {contactInfo.address}
                     </p>
                   </div>
                 </div>

@@ -1,15 +1,30 @@
 import { z } from 'zod'
 
+const deadlineSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === '' || /^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isNaN(Date.parse(value)),
+    'Invalid deadline format'
+  )
+
 const jobBodySchema = z.object({
   title: z.string().trim().min(2),
-  companyName: z.string().trim().min(2),
+  companyName: z.string().trim().min(2).optional(),
   location: z.string().trim().default(''),
   type: z.enum(['full-time', 'part-time', 'internship', 'contract']).default('full-time'),
   salary: z.string().trim().default(''),
   description: z.string().trim().default(''),
   skills: z.array(z.string().trim()).default([]),
+  skillRequirements: z.array(
+    z.object({
+      name: z.string().trim(),
+      weight: z.number().min(0).max(100).default(10),
+      level: z.string().trim().default('Intermediate')
+    })
+  ).default([]),
   requirements: z.array(z.string().trim()).default([]),
-  deadline: z.string().datetime().or(z.literal('')).optional(),
+  deadline: deadlineSchema.optional(),
   status: z.enum(['draft', 'published', 'closed']).default('published'),
 })
 

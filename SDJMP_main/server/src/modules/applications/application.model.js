@@ -41,8 +41,13 @@ const applicationSchema = new mongoose.Schema(
       default: '',
     },
     interview: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
+      method: { type: String, enum: ['online', 'offline'], default: null },
+      link: { type: String, default: '' },
+      location: { type: String, default: '' },
+      date: { type: String, default: '' },
+      time: { type: String, default: '' },
+      notes: { type: String, default: '' },
+      status: { type: String, enum: ['scheduled', 'completed', 'cancelled'], default: 'scheduled' },
     },
   },
   {

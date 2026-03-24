@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Building2,
   Calendar,
@@ -29,41 +29,40 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/shared/PageHeader'
-import { useAuth } from '@/context/AuthContext'
+import { employerAPI } from '@/services/api'
 
 const DEFAULT_PROFILE = {
-  name: 'NovaStack Labs',
+  name: '',
   industry: 'Technology & Software',
-  description:
-    'NovaStack Labs builds skill-first hiring products for emerging teams. We design practical workflows that help employers move from job posting to interview with less friction.',
-  culture:
-    'Our culture values ownership, sharp communication, and shipping thoughtful product details without unnecessary process.',
-  foundedYear: '2018',
-  size: '51-200',
-  location: 'Bengaluru, India',
-  website: 'https://novastack.example.com',
-  email: 'talent@novastack.example.com',
-  phone: '+91 80 1234 5678',
-  benefits: ['Hybrid work', 'Learning budget', 'Health insurance', 'Wellness stipend'],
+  description: '',
+  culture: '',
+  foundedYear: '',
+  size: '11-50',
+  location: '',
+  website: '',
+  email: '',
+  phone: '',
+  benefits: [],
 }
 
 export default function EmployerCompanyProfile() {
-  const { user } = useAuth()
-  const initialProfile = useMemo(
-    () => ({
-      ...DEFAULT_PROFILE,
-      name: user?.company?.name || DEFAULT_PROFILE.name,
-      size: user?.company?.size || DEFAULT_PROFILE.size,
-      location: user?.company?.location || DEFAULT_PROFILE.location,
-      industry: user?.company?.industry || DEFAULT_PROFILE.industry,
-    }),
-    [user]
-  )
-
-  const [profile, setProfile] = useState(initialProfile)
-  const [draft, setDraft] = useState(initialProfile)
+  const [profile, setProfile] = useState(DEFAULT_PROFILE)
+  const [draft, setDraft] = useState(DEFAULT_PROFILE)
   const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [newBenefit, setNewBenefit] = useState('')
+
+  useEffect(() => {
+    employerAPI.getCompanyProfile()
+      .then((data) => {
+        const merged = { ...DEFAULT_PROFILE, ...data }
+        setProfile(merged)
+        setDraft(merged)
+      })
+      .catch(() => toast.error('Failed to load company profile'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const startEditing = () => {
     setDraft(profile)
@@ -77,24 +76,36 @@ export default function EmployerCompanyProfile() {
     setIsEditing(false)
   }
 
-  const saveProfile = () => {
-    setProfile(draft)
-    setIsEditing(false)
-    toast.success('Company profile updated')
+  const saveProfile = async () => {
+    setSaving(true)
+    try {
+      await employerAPI.updateCompanyProfile(draft)
+      setProfile(draft)
+      setIsEditing(false)
+      toast.success('Company profile updated')
+    } catch (err) {
+      toast.error('Failed to update profile')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const addBenefit = () => {
     const value = newBenefit.trim()
     if (!value) return
-    setDraft((current) => ({ ...current, benefits: [...current.benefits, value] }))
+    setDraft((current) => ({ ...current, benefits: [...(current.benefits || []), value] }))
     setNewBenefit('')
   }
 
   const removeBenefit = (benefitToRemove) => {
     setDraft((current) => ({
       ...current,
-      benefits: current.benefits.filter((benefit) => benefit !== benefitToRemove),
+      benefits: (current.benefits || []).filter((benefit) => benefit !== benefitToRemove),
     }))
+  }
+
+  if (loading) {
+    return <div className="flex h-[400px] items-center justify-center text-muted-foreground">Loading profile...</div>
   }
 
   const company = isEditing ? draft : profile
@@ -107,13 +118,13 @@ export default function EmployerCompanyProfile() {
       >
         {isEditing ? (
           <>
-            <Button variant="outline" onClick={cancelEditing}>
+            <Button variant="outline" onClick={cancelEditing} disabled={saving}>
               <X className="mr-2 h-4 w-4" />
               Cancel
             </Button>
-            <Button onClick={saveProfile} className="shadow-lg shadow-primary/20">
+            <Button onClick={saveProfile} disabled={saving} className="shadow-lg shadow-primary/20">
               <Save className="mr-2 h-4 w-4" />
-              Save Changes
+              {saving ? 'Saving...' : 'Save Changes'}
             </Button>
           </>
         ) : (
@@ -133,19 +144,19 @@ export default function EmployerCompanyProfile() {
                   <Building2 className="h-8 w-8 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-black tracking-tight">{company.name}</h2>
+                  <h2 className="text-3xl font-black tracking-tight">{company.name || 'Untitled Company'}</h2>
                   <p className="mt-1 text-muted-foreground">{company.industry}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge variant="secondary">{company.size} employees</Badge>
-                    <Badge variant="outline">{company.location}</Badge>
-                    <Badge variant="outline">Founded {company.foundedYear}</Badge>
+                    <Badge variant="outline">{company.location || 'Location tbd'}</Badge>
+                    {company.foundedYear && <Badge variant="outline">Founded {company.foundedYear}</Badge>}
                   </div>
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <InfoPill icon={Users} label="Team Size" value={company.size} />
-                <InfoPill icon={MapPin} label="HQ" value={company.location} />
-                <InfoPill icon={Calendar} label="Founded" value={company.foundedYear} />
+                <InfoPill icon={MapPin} label="HQ" value={company.location || '—'} />
+                <InfoPill icon={Calendar} label="Founded" value={company.foundedYear || '—'} />
               </div>
             </div>
           </div>
@@ -168,6 +179,7 @@ export default function EmployerCompanyProfile() {
                   <Input
                     value={draft.name}
                     onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                    placeholder="Enter company name"
                   />
                 }
               />
@@ -211,6 +223,20 @@ export default function EmployerCompanyProfile() {
                   }
                 />
               </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Founded Year"
+                  editing={isEditing}
+                  value={company.foundedYear}
+                  input={
+                    <Input
+                      value={draft.foundedYear}
+                      onChange={(event) => setDraft((current) => ({ ...current, foundedYear: event.target.value }))}
+                      placeholder="e.g. 2018"
+                    />
+                  }
+                />
+              </div>
               <Field
                 label="Description"
                 editing={isEditing}
@@ -220,6 +246,7 @@ export default function EmployerCompanyProfile() {
                     value={draft.description}
                     onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
                     rows={5}
+                    placeholder="Tell candidates about your mission..."
                   />
                 }
               />
@@ -232,6 +259,7 @@ export default function EmployerCompanyProfile() {
                     value={draft.culture}
                     onChange={(event) => setDraft((current) => ({ ...current, culture: event.target.value }))}
                     rows={4}
+                    placeholder="Describe the environment and values..."
                   />
                 }
               />
@@ -245,7 +273,7 @@ export default function EmployerCompanyProfile() {
           >
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                {company.benefits.map((benefit) => (
+                {(company.benefits || []).map((benefit) => (
                   <Badge key={benefit} variant="secondary" className="px-3 py-1.5">
                     {benefit}
                     {isEditing ? (
@@ -262,6 +290,7 @@ export default function EmployerCompanyProfile() {
                     value={newBenefit}
                     onChange={(event) => setNewBenefit(event.target.value)}
                     placeholder="Add a benefit"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addBenefit())}
                   />
                   <Button type="button" variant="outline" onClick={addBenefit}>
                     <Plus className="mr-2 h-4 w-4" />
@@ -288,6 +317,7 @@ export default function EmployerCompanyProfile() {
                   <Input
                     value={draft.location}
                     onChange={(event) => setDraft((current) => ({ ...current, location: event.target.value }))}
+                    placeholder="e.g. Bengaluru, India"
                   />
                 }
               />
@@ -299,6 +329,7 @@ export default function EmployerCompanyProfile() {
                   <Input
                     value={draft.website}
                     onChange={(event) => setDraft((current) => ({ ...current, website: event.target.value }))}
+                    placeholder="https://..."
                   />
                 }
               />
@@ -310,6 +341,7 @@ export default function EmployerCompanyProfile() {
                   <Input
                     value={draft.email}
                     onChange={(event) => setDraft((current) => ({ ...current, email: event.target.value }))}
+                    placeholder="talent@company.com"
                   />
                 }
               />
@@ -321,6 +353,7 @@ export default function EmployerCompanyProfile() {
                   <Input
                     value={draft.phone}
                     onChange={(event) => setDraft((current) => ({ ...current, phone: event.target.value }))}
+                    placeholder="+91 ..."
                   />
                 }
               />
@@ -375,8 +408,8 @@ function SectionCard({ title, description, icon: Icon, children }) {
 function Field({ label, value, editing, input }) {
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      {editing ? input : <div className="rounded-2xl border bg-background/50 px-4 py-3 text-sm leading-6">{value || 'Not provided'}</div>}
+      <Label className="text-xs uppercase tracking-widest text-muted-foreground font-bold">{label}</Label>
+      {editing ? input : <div className="rounded-2xl border bg-background/50 px-4 py-3 text-sm leading-6">{value || <span className="text-muted-foreground italic">Not provided</span>}</div>}
     </div>
   )
 }
@@ -388,7 +421,7 @@ function InfoPill({ icon: Icon, label, value }) {
         <Icon className="h-3.5 w-3.5 text-primary" />
         {label}
       </div>
-      <p className="text-sm font-semibold">{value}</p>
+      <p className="text-sm font-semibold">{value || '—'}</p>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { requireAuth, requireRole } from '../../middlewares/auth.middleware.js'
 import {
   getEmployerApplicants,
   getEmployerCompanyProfile,
+  getEmployerInterviews,
   getEmployerStats,
   scheduleEmployerInterview,
   updateEmployerCompanyProfile,
@@ -15,6 +16,7 @@ employerRouter.get('/company', getEmployerCompanyProfile)
 employerRouter.put('/company', updateEmployerCompanyProfile)
 employerRouter.get('/stats', getEmployerStats)
 employerRouter.get('/applicants/:jobId', getEmployerApplicants)
+employerRouter.get('/interviews', getEmployerInterviews)
 employerRouter.post('/interview/:applicationId', scheduleEmployerInterview)
 
 export default employerRouter

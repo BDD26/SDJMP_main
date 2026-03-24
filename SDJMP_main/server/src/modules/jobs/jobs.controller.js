@@ -1,4 +1,5 @@
 import Job from './job.model.js'
+import Application from '../applications/application.model.js'
 import { serializeJob } from './jobs.service.js'
 import { createHttpError } from '../../utils/http-error.js'
 
@@ -63,11 +64,49 @@ export async function createJob(req, res) {
 
   const job = await Job.create({
     ...body,
+    companyName: body.companyName || req.user.company?.name || req.user.name || 'Unknown Company',
     deadline: body.deadline ? new Date(body.deadline) : null,
     employerId: req.user._id,
   })
 
   res.status(201).json(serializeJob(job))
+}
+
+export async function getEmployerJobs(req, res) {
+  const jobs = await Job.find({ employerId: req.user._id }).sort({ createdAt: -1 }).lean()
+
+  if (!jobs.length) {
+    return res.status(200).json([])
+  }
+
+  const jobIds = jobs.map((j) => j._id)
+
+  // Aggregate applicant and interview counts per job in one query
+  const aggregation = await Application.aggregate([
+    { $match: { jobId: { $in: jobIds } } },
+    {
+      $group: {
+        _id: '$jobId',
+        applicants: { $sum: 1 },
+        interviews: {
+          $sum: { $cond: [{ $eq: ['$status', 'interview'] }, 1, 0] },
+        },
+      },
+    },
+  ])
+
+  const countsMap = {}
+  aggregation.forEach((row) => {
+    countsMap[String(row._id)] = { applicants: row.applicants, interviews: row.interviews }
+  })
+
+  const result = jobs.map((job) => {
+    const serialized = serializeJob({ ...job, toObject: () => job })
+    const counts = countsMap[String(job._id)] || { applicants: 0, interviews: 0 }
+    return { ...serialized, applicants: counts.applicants, interviews: counts.interviews }
+  })
+
+  res.status(200).json(result)
 }
 
 export async function updateJob(req, res) {
@@ -83,6 +122,10 @@ export async function updateJob(req, res) {
 
   const updates = req.validated.body
   Object.entries(updates).forEach(([key, value]) => {
+    if (key === 'companyName') {
+      return
+    }
+
     if (key === 'deadline') {
       job.deadline = value ? new Date(value) : null
       return
@@ -90,6 +133,8 @@ export async function updateJob(req, res) {
 
     job[key] = value
   })
+
+  job.companyName = req.user.company?.name || req.user.name || job.companyName
 
   await job.save()
 
@@ -107,6 +152,7 @@ export async function deleteJob(req, res) {
     throw createHttpError(403, 'You do not have access to this job')
   }
 
+  await Application.deleteMany({ jobId: job._id })
   await job.deleteOne()
 
   res.status(200).json({

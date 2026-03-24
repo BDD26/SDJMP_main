@@ -1,17 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { 
-  Briefcase, 
-  MapPin, 
-  DollarSign, 
-  Calendar, 
-  Plus, 
-  Trash2, 
-  ChevronLeft, 
-  Save, 
-  Sparkles,
+import {
+  Briefcase,
+  MapPin,
+  DollarSign,
+  Calendar,
+  Plus,
+  Trash2,
+  Save,
   Info,
-  Building2,
   FileText,
   Target,
   AlertTriangle,
@@ -29,31 +26,55 @@ import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { GlassCard } from '@/components/shared/GlassCard'
+import { jobsAPI } from '@/services/api'
+
+const EMPTY_FORM = {
+  title: '',
+  type: 'full-time',
+  location: '',
+  salary: '',
+  deadline: '',
+  description: '',
+  skills: [],
+  status: 'draft',
+}
 
 export default function JobPostForm() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isEditing = !!id
 
-  const [formData, setFormData] = useState({
-    title: isEditing ? 'Senior React Developer' : '',
-    type: 'Full-time',
-    location: isEditing ? 'San Francisco, CA' : '',
-    salary: isEditing ? '$120k - $160k' : '',
-    deadline: isEditing ? '2026-04-15' : '',
-    description: isEditing ? 'We are looking for a Senior React Developer...' : '',
-    skills: isEditing ? [
-      { name: 'React', weight: 40, level: 'Expert' },
-      { name: 'TypeScript', weight: 30, level: 'Advanced' }
-    ] : [],
-    status: isEditing ? 'Active' : 'Draft'
-  })
-
+  const [formData, setFormData] = useState(EMPTY_FORM)
   const [newSkill, setNewSkill] = useState({ name: '', weight: 10, level: 'Intermediate' })
+  const [loading, setLoading] = useState(isEditing)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!isEditing) return
+    setLoading(true)
+    jobsAPI.getById(id)
+      .then((job) => {
+        setFormData({
+          title:       job.title || '',
+          type:        job.type  || 'full-time',
+          location:    job.location || '',
+          salary:      job.salary || '',
+          deadline:    job.deadline ? job.deadline.slice(0, 10) : '',
+          description: job.description || '',
+          // Prefer skillRequirements if available, fallback to skills strings
+          skills: job.skillRequirements && job.skillRequirements.length > 0
+            ? job.skillRequirements.map(sr => ({ name: sr.name, weight: sr.weight, level: sr.level }))
+            : (job.skills || []).map((name) => ({ name, weight: 10, level: 'Intermediate' })),
+          status: job.status || 'draft',
+        })
+      })
+      .catch(() => toast.error('Failed to load job data'))
+      .finally(() => setLoading(false))
+  }, [id, isEditing])
 
   const addSkill = () => {
-    if (!newSkill.name) return
-    setFormData({ ...formData, skills: [...formData.skills, newSkill] })
+    if (!newSkill.name.trim()) return
+    setFormData({ ...formData, skills: [...formData.skills, { ...newSkill }] })
     setNewSkill({ name: '', weight: 10, level: 'Intermediate' })
   }
 
@@ -61,10 +82,49 @@ export default function JobPostForm() {
     setFormData({ ...formData, skills: formData.skills.filter((_, i) => i !== idx) })
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    toast.success(isEditing ? 'Job updated successfully!' : 'Job posted successfully!')
-    navigate('/employer/jobs')
+    if (!formData.title.trim()) { toast.error('Job title is required'); return }
+
+    const payload = {
+      title:       formData.title,
+      type:        formData.type,
+      location:    formData.location,
+      salary:      formData.salary,
+      deadline:    formData.deadline || '',
+      description: formData.description,
+      skills:      formData.skills.map((s) => s.name),
+      skillRequirements: formData.skills.map(s => ({
+        name: s.name,
+        weight: s.weight,
+        level: s.level
+      })),
+      status:      formData.status,
+    }
+
+    setSaving(true)
+    try {
+      if (isEditing) {
+        await jobsAPI.update(id, payload)
+        toast.success('Job updated successfully!')
+      } else {
+        await jobsAPI.create(payload)
+        toast.success('Job posted successfully!')
+      }
+      navigate('/employer/jobs')
+    } catch (err) {
+      toast.error(err?.message || 'Failed to save job')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px] text-muted-foreground text-sm">
+        Loading job details…
+      </div>
+    )
   }
 
   return (
@@ -73,16 +133,11 @@ export default function JobPostForm() {
         title={isEditing ? 'Edit Job Posting' : 'Post New Job'}
         description="Fill in the details to find the perfect candidate."
       >
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-        </div>
         <div className="flex gap-3">
           <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
-          <Button onClick={handleSubmit} className="shadow-lg shadow-primary/20 px-8 rounded-xl font-bold">
+          <Button onClick={handleSubmit} disabled={saving} className="shadow-lg shadow-primary/20 px-8 rounded-xl font-bold">
             <Save className="h-4 w-4 mr-2" />
-            {isEditing ? 'Update Job' : 'Post Job'}
+            {saving ? 'Saving…' : isEditing ? 'Update Job' : 'Post Job'}
           </Button>
         </div>
       </PageHeader>
@@ -99,11 +154,11 @@ export default function JobPostForm() {
             <CardContent className="p-8 space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="title">Job Title</Label>
-                <Input 
-                  id="title" 
-                  placeholder="e.g. Senior Frontend Developer" 
-                  value={formData.title} 
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                <Input
+                  id="title"
+                  placeholder="e.g. Senior Frontend Developer"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="h-12 text-lg rounded-xl"
                 />
               </div>
@@ -111,15 +166,13 @@ export default function JobPostForm() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label>Employment Type</Label>
-                  <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
-                    <SelectTrigger className="h-12 rounded-xl">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
+                  <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
+                    <SelectTrigger className="h-12 rounded-xl"><SelectValue placeholder="Select type" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Full-time">Full-time</SelectItem>
-                      <SelectItem value="Part-time">Part-time</SelectItem>
-                      <SelectItem value="Contract">Contract</SelectItem>
-                      <SelectItem value="Freelance">Freelance</SelectItem>
+                      <SelectItem value="full-time">Full-time</SelectItem>
+                      <SelectItem value="part-time">Part-time</SelectItem>
+                      <SelectItem value="contract">Contract</SelectItem>
+                      <SelectItem value="internship">Internship</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -127,11 +180,11 @@ export default function JobPostForm() {
                   <Label htmlFor="location">Location</Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="location" 
-                      placeholder="e.g. Remote or City, State" 
+                    <Input
+                      id="location"
+                      placeholder="e.g. Remote or City, State"
                       value={formData.location}
-                      onChange={(e) => setFormData({...formData, location: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                       className="pl-10 h-12 rounded-xl"
                     />
                   </div>
@@ -143,11 +196,11 @@ export default function JobPostForm() {
                   <Label htmlFor="salary">Salary Range</Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="salary" 
-                      placeholder="e.g. $80k - $120k" 
+                    <Input
+                      id="salary"
+                      placeholder="e.g. $80k – $120k"
                       value={formData.salary}
-                      onChange={(e) => setFormData({...formData, salary: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
                       className="pl-10 h-12 rounded-xl"
                     />
                   </div>
@@ -156,11 +209,11 @@ export default function JobPostForm() {
                   <Label htmlFor="deadline">Application Deadline</Label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="deadline" 
-                      type="date" 
+                    <Input
+                      id="deadline"
+                      type="date"
                       value={formData.deadline}
-                      onChange={(e) => setFormData({...formData, deadline: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                       className="pl-10 h-12 rounded-xl"
                     />
                   </div>
@@ -170,14 +223,12 @@ export default function JobPostForm() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label>Posting Status</Label>
-                  <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v})}>
-                    <SelectTrigger className="h-12 rounded-xl">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
+                  <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                    <SelectTrigger className="h-12 rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Active">Active (Visible to Students)</SelectItem>
-                      <SelectItem value="Draft">Draft (Private)</SelectItem>
-                      <SelectItem value="Closed">Closed</SelectItem>
+                      <SelectItem value="published">Published (Visible to Students)</SelectItem>
+                      <SelectItem value="draft">Draft (Private)</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -185,12 +236,12 @@ export default function JobPostForm() {
 
               <div className="space-y-2">
                 <Label htmlFor="description">Job Description</Label>
-                <Textarea 
-                  id="description" 
-                  placeholder="Describe the role, responsibilities, and team culture..." 
+                <Textarea
+                  id="description"
+                  placeholder="Describe the role, responsibilities, and team culture..."
                   className="min-h-[200px] rounded-xl p-4"
                   value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </div>
             </CardContent>
@@ -202,25 +253,26 @@ export default function JobPostForm() {
                 <Target className="h-5 w-5 text-primary" />
                 Skill Requirements & Weights
               </CardTitle>
-              <CardDescription>Assign weights to skills to fine-tune the Match Score algorithm.</CardDescription>
+              <CardDescription>
+                Add the skills this role requires. Higher-weighted skills contribute more to the candidate match score.
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-8">
               <div className="bg-muted/30 p-6 rounded-2xl border border-dashed border-muted-foreground/30 flex flex-col md:flex-row gap-4 items-end">
                 <div className="flex-1 space-y-2">
                   <Label>Skill Name</Label>
-                  <Input 
-                    placeholder="e.g. Python" 
-                    value={newSkill.name} 
-                    onChange={(e) => setNewSkill({...newSkill, name: e.target.value})}
+                  <Input
+                    placeholder="e.g. Python"
+                    value={newSkill.name}
+                    onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })}
                     className="rounded-xl h-11"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
                   />
                 </div>
                 <div className="w-full md:w-32 space-y-2">
                   <Label>Level</Label>
-                  <Select value={newSkill.level} onValueChange={(v) => setNewSkill({...newSkill, level: v})}>
-                    <SelectTrigger className="rounded-xl h-11">
-                      <SelectValue />
-                    </SelectTrigger>
+                  <Select value={newSkill.level} onValueChange={(v) => setNewSkill({ ...newSkill, level: v })}>
+                    <SelectTrigger className="rounded-xl h-11"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Beginner">Beginner</SelectItem>
                       <SelectItem value="Intermediate">Intermediate</SelectItem>
@@ -234,15 +286,15 @@ export default function JobPostForm() {
                     <Label>Weight</Label>
                     <span>{newSkill.weight}%</span>
                   </div>
-                  <Slider 
-                    value={[newSkill.weight]} 
-                    onValueChange={([v]) => setNewSkill({...newSkill, weight: v})}
+                  <Slider
+                    value={[newSkill.weight]}
+                    onValueChange={([v]) => setNewSkill({ ...newSkill, weight: v })}
                     max={100}
                     step={5}
                   />
                 </div>
                 <Button onClick={addSkill} className="rounded-xl h-11 px-6">
-                  <Plus className="h-4 w-4 mr-2" /> Add
+                  <Plus className="h-4 w-4 mr-2" />Add
                 </Button>
               </div>
 
@@ -259,9 +311,9 @@ export default function JobPostForm() {
                         <span className="text-sm font-black text-primary w-12 text-right">{skill.weight}%</span>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => removeSkill(idx)}
                       className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                     >
@@ -280,42 +332,46 @@ export default function JobPostForm() {
           </GlassCard>
         </div>
 
+        {/* Sidebar: Skill Match Preview */}
         <div className="space-y-6">
           <GlassCard className="overflow-hidden sticky top-24">
             <CardHeader className="bg-primary text-white">
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                AI Match Preview
+                <Target className="h-5 w-5" />
+                Skill Match Preview
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mb-2">Algorithm Confidence</p>
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mb-2">Skills Defined</p>
                 <div className="flex items-end gap-2">
-                  <span className="text-3xl font-black text-primary">High</span>
-                  <Badge className="bg-emerald-500 text-white mb-1">94% Accurate</Badge>
+                  <span className="text-3xl font-black text-primary">{formData.skills.length}</span>
+                  <Badge className="bg-emerald-500 text-white mb-1">
+                    {formData.skills.length === 0
+                      ? 'No skills yet'
+                      : formData.skills.length === 1 ? '1 skill' : `${formData.skills.length} skills`}
+                  </Badge>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Based on your weights, we will prioritize candidates with <b>{formData.skills[0]?.name || 'relevant'}</b> experience.
+                  {formData.skills.length > 0
+                    ? <>Candidates will be matched based on your <b>weighted requirements</b>. A higher weight on a skill like <b>{formData.skills[0]?.name}</b> will prioritize candidates who possess it.</>
+                    : 'Add skill requirements and adjust their weights to enable precise, weighted matching for this role.'}
                 </p>
-                <div className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Estimated Reach</p>
-                  <div className="flex justify-between items-center bg-muted/30 p-3 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-primary" />
-                      <span className="font-bold text-sm">Targeted Students</span>
-                    </div>
-                    <span className="font-black">1.2k+</span>
+                {formData.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.skills.map((s) => (
+                      <Badge key={s.name} variant="secondary">{s.name}</Badge>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
 
-              <Button variant="ghost" className="w-full text-xs text-primary gap-1">
+              <Button variant="ghost" className="w-full text-xs text-primary gap-1" onClick={() => {}}>
                 <Info className="h-3 w-3" />
-                Learn about weighted matching
+                How skill matching works
               </Button>
             </CardContent>
             <CardFooter className="bg-muted/5 border-t p-6">
@@ -329,7 +385,7 @@ export default function JobPostForm() {
           </GlassCard>
         </div>
       </div>
-
     </div>
   )
 }
+
