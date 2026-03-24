@@ -3,6 +3,7 @@ import Resume from './resume.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { comparePassword, hashPassword, sanitizeUser } from '../auth/auth.service.js'
 import { destroyCloudinaryRawAsset } from '../../utils/cloudinary.js'
+import { uploadResumeLocally, deleteLocalResumeFile } from '../../utils/local-upload.js'
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -217,6 +218,14 @@ export async function deleteResume(req, res) {
       await destroyCloudinaryRawAsset(resume.filePublicId)
     } catch (error) {
       console.warn('Failed to delete Cloudinary resume asset', error)
+    }
+  }
+
+  if (resume.fileUrl && resume.storageProvider === 'local') {
+    try {
+      await deleteLocalResumeFile(resume.fileUrl)
+    } catch (error) {
+      console.warn('Failed to delete local resume file', error)
     }
   }
 
