@@ -4,6 +4,69 @@ import { createHttpError } from '../../utils/http-error.js'
 import { comparePassword, hashPassword, sanitizeUser } from '../auth/auth.service.js'
 import { destroyCloudinaryRawAsset } from '../../utils/cloudinary.js'
 
+function normalizeString(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeStringArray(values = []) {
+  const source = Array.isArray(values) ? values : [values]
+
+  return source
+    .flat(Infinity)
+    .map((value) => (typeof value === 'string' ? value.trim() : String(value || '').trim()))
+    .filter(Boolean)
+}
+
+function normalizeProfile(profile = {}) {
+  return {
+    bio: normalizeString(profile.bio),
+    location: normalizeString(profile.location),
+    skills: Array.isArray(profile.skills)
+      ? profile.skills
+          .map((skill) => ({
+            name: normalizeString(skill?.name),
+            level: skill?.level || 'intermediate',
+            years: Number.isFinite(Number(skill?.years)) ? Number(skill.years) : 0,
+          }))
+          .filter((skill) => skill.name)
+      : [],
+    education: Array.isArray(profile.education)
+      ? profile.education
+          .map((item, index) => ({
+            id: item?.id ? String(item.id) : `edu-${Date.now()}-${index}`,
+            degree: normalizeString(item?.degree),
+            institution: normalizeString(item?.institution),
+            year: normalizeString(item?.year),
+          }))
+          .filter((item) => item.degree || item.institution || item.year)
+      : [],
+    projects: Array.isArray(profile.projects)
+      ? profile.projects
+          .map((item, index) => ({
+            id: item?.id ? String(item.id) : `project-${Date.now()}-${index}`,
+            title: normalizeString(item?.title),
+            description: normalizeString(item?.description),
+            link: normalizeString(item?.link),
+          }))
+          .filter((item) => item.title || item.description || item.link)
+      : [],
+    certifications: Array.isArray(profile.certifications)
+      ? profile.certifications
+          .map((item) => ({
+            name: normalizeString(item?.name),
+            issuer: normalizeString(item?.issuer),
+            year: normalizeString(item?.year),
+          }))
+          .filter((item) => item.name || item.issuer || item.year)
+      : [],
+    preferences: {
+      jobTypes: normalizeStringArray(profile.preferences?.jobTypes),
+      locations: normalizeStringArray(profile.preferences?.locations),
+      minSalary: normalizeString(profile.preferences?.minSalary),
+    },
+  }
+}
+
 export async function getProfile(req, res) {
   res.status(200).json({
     user: sanitizeUser(req.user),
@@ -22,9 +85,29 @@ export async function updateProfile(req, res) {
   }
 
   if (body.profile !== undefined) {
+    const existingProfile = normalizeProfile(req.user.profile || {})
+    const incomingProfile = body.profile
+
     req.user.profile = {
-      ...(req.user.profile || {}),
-      ...body.profile,
+      bio: incomingProfile.bio !== undefined ? normalizeString(incomingProfile.bio) : existingProfile.bio,
+      location: incomingProfile.location !== undefined ? normalizeString(incomingProfile.location) : existingProfile.location,
+      skills: incomingProfile.skills !== undefined ? normalizeProfile({ skills: incomingProfile.skills }).skills : existingProfile.skills,
+      education: incomingProfile.education !== undefined ? normalizeProfile({ education: incomingProfile.education }).education : existingProfile.education,
+      projects: incomingProfile.projects !== undefined ? normalizeProfile({ projects: incomingProfile.projects }).projects : existingProfile.projects,
+      certifications: incomingProfile.certifications !== undefined ? normalizeProfile({ certifications: incomingProfile.certifications }).certifications : existingProfile.certifications,
+      preferences: incomingProfile.preferences !== undefined
+        ? {
+            jobTypes: incomingProfile.preferences.jobTypes !== undefined
+              ? normalizeStringArray(incomingProfile.preferences.jobTypes)
+              : existingProfile.preferences.jobTypes,
+            locations: incomingProfile.preferences.locations !== undefined
+              ? normalizeStringArray(incomingProfile.preferences.locations)
+              : existingProfile.preferences.locations,
+            minSalary: incomingProfile.preferences.minSalary !== undefined
+              ? normalizeString(incomingProfile.preferences.minSalary)
+              : existingProfile.preferences.minSalary,
+          }
+        : existingProfile.preferences,
     }
   }
 

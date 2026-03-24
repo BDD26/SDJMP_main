@@ -17,7 +17,8 @@ import {
   ArrowRight,
   Download,
   ShieldCheck,
-  Star
+  Star,
+  Loader2
 } from 'lucide-react'
 import { 
   Dialog, 
@@ -29,100 +30,20 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
-
-const INITIAL_ASSESSMENTS = [
-  {
-    id: 1,
-    name: 'React Advanced Concepts',
-    status: 'completed',
-    score: 92,
-    date: '2 weeks ago',
-    category: 'Development',
-    duration: '30 mins',
-    questions: 20
-  },
-  {
-    id: 2,
-    name: 'TypeScript Fundamentals',
-    status: 'completed',
-    score: 88,
-    date: '1 month ago',
-    category: 'Development',
-    duration: '20 mins',
-    questions: 15
-  },
-  {
-    id: 3,
-    name: 'System Design Patterns',
-    status: 'in_progress',
-    score: null,
-    progress: 60,
-    category: 'Architecture',
-    duration: '45 mins',
-    questions: 25
-  },
-  {
-    id: 4,
-    name: 'Python Data Structures',
-    status: 'pending',
-    score: null,
-    category: 'Programming',
-    duration: '30 mins',
-    questions: 20
-  },
-]
-
-const MOCK_QUESTIONS = [
-  {
-    id: 1,
-    text: "What is the primary purpose of the 'useEffect' hook in React?",
-    options: [
-      "To handle side effects in functional components",
-      "To manage local state in class components",
-      "To optimize rendering performance automatically",
-      "To define global styles for the application"
-    ],
-    correct: 0
-  },
-  {
-    id: 2,
-    text: "Which of the following is NOT a valid React Hook?",
-    options: [
-      "useState",
-      "useContext",
-      "useReducer",
-      "useDataFetch"
-    ],
-    correct: 3
-  },
-  {
-    id: 3,
-    text: "How do you pass data from a parent component to a child component?",
-    options: [
-      "Using local storage",
-      "Using context only",
-      "Using props",
-      "Using Redux dispatch"
-    ],
-    correct: 2
-  }
-]
-
 import api from '@/services/api'
 
 export default function StudentAssessments() {
   const { user } = useAuth()
-  const [assessments, setAssessments] = useState([])
+  const [availableAssessments, setAvailableAssessments] = useState([])
+  const [myResults, setMyResults] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isTakingTest, setIsTakingTest] = useState(false)
   const [activeTest, setActiveTest] = useState(null)
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0)
   const [answers, setAnswers] = useState({})
-  const [timeLeft, setTimeLeft] = useState(600) // 10 minutes in seconds
-  const [isFinished, setIsFinished] = useState(false)
-  const [showCertificate, setShowCertificate] = useState(false)
-  const [showReviewAnswers, setShowReviewAnswers] = useState(false)
-  const [selectedAssessment, setSelectedAssessment] = useState(null)
+  const [timeLeft, setTimeLeft] = useState(null)
+  const [showResults, setShowResults] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     fetchAssessments()
@@ -131,50 +52,22 @@ export default function StudentAssessments() {
   const fetchAssessments = async () => {
     try {
       setIsLoading(true)
-      const [allAssessments, myResults] = await Promise.all([
+      setError(null)
+      const [allAssessments, results] = await Promise.all([
         api.assessments.getAll(),
         api.assessments.getMyResults()
       ])
-
-      const combined = allAssessments.map(assessment => {
-        const progressRecord = myResults.find(r => 
-          r.assessmentId?._id === assessment._id || 
-          r.assessmentId === assessment._id
-        )
-        
-        return {
-          id: assessment._id,
-          name: assessment.title,
-          status: progressRecord ? progressRecord.status : 'pending',
-          score: progressRecord?.score || null,
-          progress: progressRecord?.progress || 0,
-          date: progressRecord?.updatedAt ? new Date(progressRecord.updatedAt).toLocaleDateString() : null,
-          category: assessment.category || 'Skill',
-          duration: assessment.durationMinutes ? `${assessment.durationMinutes} mins` : '30 mins',
-          questions: assessment.questions || [],
-          numQuestions: assessment.questions?.length || 0
-        }
-      })
       
-      setAssessments(combined)
+      setAvailableAssessments(allAssessments || [])
+      setMyResults(results || [])
     } catch (error) {
+      setError('Failed to load assessments')
       toast.error('Failed to load assessments')
+      console.error('Assessment error:', error)
     } finally {
       setIsLoading(false)
     }
   }
-
-  useEffect(() => {
-    let timer
-    if (isTakingTest && !isFinished && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft(prev => prev - 1)
-      }, 1000)
-    } else if (timeLeft === 0 && !isFinished) {
-      handleFinish()
-    }
-    return () => clearInterval(timer)
-  }, [isTakingTest, isFinished, timeLeft])
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
@@ -182,19 +75,29 @@ export default function StudentAssessments() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const handleStartTest = async (assessment) => {
+  const handleStartAssessment = async (assessmentId) => {
     try {
-      if (assessment.status !== 'in_progress') {
-        await api.assessments.startAssessment(assessment.id)
-      }
-      setActiveTest(assessment)
+      setIsLoading(true)
+      const startedAssessment = await api.assessments.startAssessment(assessmentId)
+      
+      // Get assessment questions
+      const questionsData = await api.assessments.getQuestions(assessmentId)
+      
+      setActiveTest({
+        ...questionsData,
+        studentAssessmentId: startedAssessment._id
+      })
+      
+      setTimeLeft(questionsData.durationMinutes * 60)
       setIsTakingTest(true)
       setCurrentQuestionIdx(0)
       setAnswers({})
-      setTimeLeft(parseInt(assessment.duration) * 60)
-      setIsFinished(false)
+      
+      toast.success('Assessment started!')
     } catch (error) {
-      toast.error('Failed to start test')
+      toast.error(error.message || 'Failed to start assessment')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -204,17 +107,24 @@ export default function StudentAssessments() {
 
   const handleNext = async () => {
     if (!activeTest?.questions) return
+    
     const currentQ = activeTest.questions[currentQuestionIdx]
-    if (currentQ) {
+    if (currentQ && answers[currentQuestionIdx] !== undefined) {
       try {
-        await api.assessments.submitAnswer(activeTest.id, currentQ._id || currentQ.id, answers[currentQuestionIdx])
-      } catch (e) { console.error('Failed to sync answer', e) }
+        await api.assessments.submitAnswer(
+          activeTest.assessmentId, 
+          currentQ._id || currentQ.id, 
+          answers[currentQuestionIdx]
+        )
+      } catch (error) {
+        toast.error('Failed to save answer')
+      }
     }
 
     if (currentQuestionIdx < activeTest.questions.length - 1) {
       setCurrentQuestionIdx(prev => prev + 1)
     } else {
-      handleFinish()
+      await completeAssessment()
     }
   }
 
@@ -224,128 +134,42 @@ export default function StudentAssessments() {
     }
   }
 
-  const handleFinish = async () => {
-    setIsFinished(true)
+  const completeAssessment = async () => {
     try {
-      const result = await api.assessments.completeAssessment(activeTest.id)
-      setAssessments(prev => prev.map(a => 
-        a.id === activeTest.id 
-          ? { ...a, status: 'completed', score: result?.score || 100, date: 'Just now' } 
-          : a
-      ))
-      setActiveTest(prev => ({ ...prev, computedScore: result?.score || 100 }))
-      toast.success('Assessment completed!')
-    } catch (error) {
-      toast.error('Evaluation failed locally, refreshing data.')
-      fetchAssessments()
+      const result = await api.assessments.completeAssessment(activeTest.assessmentId)
+      
+      setActiveTest(prev => ({ ...prev, ...result }))
+      setShowResults(true)
       setIsTakingTest(false)
+      
+      toast.success('Assessment completed!')
+      
+      // Refresh results
+      fetchAssessments()
+    } catch (error) {
+      toast.error('Failed to complete assessment')
     }
   }
 
   if (isTakingTest) {
-    if (isFinished) {
-      return (
-        <div className="max-w-2xl mx-auto py-12 px-4 animate-in fade-in zoom-in duration-500">
-          <Card className="border-none shadow-2xl glass overflow-hidden text-center p-12">
-            <div className="h-24 w-24 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-8 animate-bounce">
-              <Trophy className="h-12 w-12 text-emerald-500" />
-            </div>
-            <h2 className="text-4xl font-extrabold mb-4">Congratulations!</h2>
-            <p className="text-muted-foreground text-lg mb-8">
-              You've successfully completed the <b>{activeTest.name}</b> assessment.
-            </p>
-            
-            <div className="bg-muted/30 rounded-3xl p-8 mb-10 border border-white/20">
-              <div className="grid grid-cols-2 gap-8">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Final Score</p>
-                  <p className="text-5xl font-black text-primary">{activeTest.computedScore || activeTest.score || 0}%</p>
-                </div>
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Status</p>
-                  <Badge className="bg-emerald-500 text-white hover:bg-emerald-600 text-lg py-1 px-4">PASSED</Badge>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Button onClick={() => setIsTakingTest(false)} className="w-full h-14 text-lg font-bold rounded-2xl shadow-lg shadow-primary/20">
-                Back to Dashboard
-              </Button>
-              <Button 
-                variant="ghost" 
-                className="w-full font-bold"
-                onClick={() => setShowReviewAnswers(true)}
-              >
-                Review My Answers
-              </Button>
-            </div>
-
-            {/* Review Answers Modal */}
-            <Dialog open={showReviewAnswers} onOpenChange={setShowReviewAnswers}>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Review Your Answers</DialogTitle>
-                  <DialogDescription>Review the questions and your selected answers from the assessment.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-6 mt-4">
-                  {activeTest.questions?.map((q, idx) => (
-                    <div key={idx} className="p-4 rounded-xl border bg-muted/30">
-                      <p className="font-semibold mb-2">{idx + 1}. {q.question || q.text}</p>
-                      <div className="space-y-2">
-                        {q.options?.map((opt, optIdx) => (
-                          <div
-                            key={optIdx}
-                            className={`p-3 rounded-lg text-sm ${
-                              answers[idx] === optIdx
-                                ? optIdx === q.correctAnswer
-                                  ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-destructive/10 border border-destructive/30 text-destructive'
-                                : optIdx === q.correctAnswer
-                                  ? 'bg-emerald-500/10 border border-emerald-500/30'
-                                  : 'bg-muted/50'
-                            }`}
-                          >
-                            {String.fromCharCode(65 + optIdx)}. {opt}
-                            {answers[idx] === optIdx && <span className="ml-2 font-bold">(Your answer)</span>}
-                            {optIdx === q.correctAnswer && answers[idx] !== optIdx && <span className="ml-2 font-bold text-emerald-600">(Correct)</span>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button onClick={() => setShowReviewAnswers(false)} className="w-full mt-4">
-                  Close
-                </Button>
-              </DialogContent>
-            </Dialog>
-          </Card>
-        </div>
-      )
-    }
-
     const currentQuestion = activeTest?.questions?.[currentQuestionIdx]
     const progress = activeTest?.questions ? ((currentQuestionIdx + 1) / activeTest.questions.length) * 100 : 0
 
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4 space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <BookOpen className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold font-heading">{activeTest.name}</h2>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-tighter">
-                <span>Question {currentQuestionIdx + 1} of {MOCK_QUESTIONS.length}</span>
-              </div>
+          <div>
+            <h2 className="text-xl font-bold font-heading">{activeTest.title}</h2>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-bold uppercase tracking-tighter">
+              <span>Question {currentQuestionIdx + 1} of {activeTest.questions?.length || 0}</span>
             </div>
           </div>
-          
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl border ${timeLeft < 60 ? 'bg-destructive/10 border-destructive text-destructive animate-pulse' : 'bg-muted/50 border-white/20'}`}>
-            <Timer className="h-4 w-4" />
-            <span className="font-mono font-bold text-lg">{formatTime(timeLeft)}</span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Timer className="h-4 w-4 text-amber-500" />
+              <span className="font-mono text-sm">{Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}</span>
+            </div>
+            <Progress value={progress} className="w-32" />
           </div>
         </div>
 
@@ -424,10 +248,28 @@ export default function StudentAssessments() {
     )
   }
 
-  const handleViewCertificate = (assessment) => {
-    setSelectedAssessment(assessment)
-    setShowCertificate(true)
+  const getAssessmentStatus = (assessmentId) => {
+    const result = myResults.find(r => r.assessmentId._id === assessmentId)
+    if (!result) return 'available'
+    return result.status
   }
+
+  const getAssessmentScore = (assessmentId) => {
+    const result = myResults.find(r => r.assessmentId._id === assessmentId)
+    return result?.score || null
+  }
+
+  const getAssessmentProgress = (assessmentId) => {
+    const result = myResults.find(r => r.assessmentId._id === assessmentId)
+    return result?.progress || 0
+  }
+
+  // Calculate real stats from results
+  const completedAssessments = myResults.filter(r => r.status === 'completed')
+  const badgesEarned = completedAssessments.length
+  const avgScore = completedAssessments.length > 0 
+    ? Math.round(completedAssessments.reduce((sum, r) => sum + (r.score || 0), 0) / completedAssessments.length)
+    : 0
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 animate-fade-in">
@@ -438,20 +280,20 @@ export default function StudentAssessments() {
           </Badge>
           <h1 className="text-5xl font-black tracking-tight font-heading">Skill <span className="text-primary">Assessments</span></h1>
           <p className="text-muted-foreground text-lg mt-3 max-w-xl">
-            Validate your expertise through industry-standard tests and boost your profile visibility by <span className="text-foreground font-bold">2.5x</span>.
+            Validate your expertise through industry-standard tests and boost your profile visibility.
           </p>
         </div>
         <div className="flex gap-4">
           <Card className="p-4 bg-primary text-white shadow-xl shadow-primary/20 rounded-3xl border-none">
             <div className="text-center">
-              <p className="text-4xl font-black">12</p>
+              <p className="text-4xl font-black">{badgesEarned}</p>
               <p className="text-[10px] uppercase font-bold tracking-widest text-white/70">Badges Earned</p>
             </div>
           </Card>
           <Card className="p-4 glass rounded-3xl border-none shadow-xl">
             <div className="text-center">
-              <p className="text-4xl font-black">88<span className="text-lg text-primary">%</span></p>
-              <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Avg. Percentile</p>
+              <p className="text-4xl font-black">{avgScore}<span className="text-lg text-primary">%</span></p>
+              <p className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground">Avg. Score</p>
             </div>
           </Card>
         </div>
@@ -459,9 +301,29 @@ export default function StudentAssessments() {
 
       <div className="grid gap-6">
         {isLoading ? (
-          <div className="py-12 text-center text-muted-foreground animate-pulse">Loading assessments...</div>
-        ) : assessments.map((assessment) => (
-          <Card key={assessment.id} className="border-none shadow-xl glass hover:shadow-2xl transition-all duration-300 group overflow-hidden relative">
+          <div className="py-12 text-center text-muted-foreground animate-pulse">
+            <Loader2 className="h-8 w-8 mx-auto mb-4 animate-spin" />
+            <div className="text-lg font-medium">Loading assessments...</div>
+          </div>
+        ) : error ? (
+          <div className="py-12 text-center">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+            <div className="text-lg font-medium mb-2">{error}</div>
+            <Button onClick={fetchAssessments} variant="outline">Try Again</Button>
+          </div>
+        ) : availableAssessments.length === 0 ? (
+          <div className="py-12 text-center">
+            <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <div className="text-lg font-medium mb-2">No assessments available</div>
+            <p className="text-muted-foreground">Check back later for new skill assessments</p>
+          </div>
+        ) : availableAssessments.map((assessment) => {
+          const status = getAssessmentStatus(assessment._id)
+          const score = getAssessmentScore(assessment._id)
+          const progress = getAssessmentProgress(assessment._id)
+          
+          return (
+          <Card key={assessment._id} className="border-none shadow-xl glass hover:shadow-2xl transition-all duration-300 group overflow-hidden relative">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
               <Award className="h-32 w-32" />
             </div>
@@ -471,56 +333,55 @@ export default function StudentAssessments() {
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center gap-3">
                     <div className={`h-12 w-12 rounded-2xl flex items-center justify-center transition-colors ${
-                      assessment.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'
+                      status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'
                     }`}>
                       <Trophy className="h-6 w-6" />
                     </div>
                     <div>
                       <Badge variant="outline" className="mb-1 text-[10px] uppercase tracking-widest">
-                        {assessment.category}
+                        {assessment.category || 'General'}
                       </Badge>
                       <h3 className="text-2xl font-bold font-heading leading-none group-hover:text-primary transition-colors">
-                        {assessment.name}
+                        {assessment.title}
                       </h3>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-6">
-                    {assessment.status === 'completed' ? (
+                    {status === 'completed' ? (
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                           <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                           <span className="text-sm font-black text-emerald-600">
-                             {assessment.score}% (Passed)
+                             {score}% (Passed)
                           </span>
                         </div>
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> {assessment.date}
+                          <Clock className="h-3 w-3" /> Completed
                         </span>
                       </div>
-                    ) : assessment.status === 'in_progress' ? (
+                    ) : status === 'in_progress' ? (
                       <div className="flex-1 max-w-sm space-y-2">
                         <div className="flex items-center justify-between text-xs font-bold text-muted-foreground uppercase tracking-widest">
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-amber-500" /> Resume where you left</span>
-                          <span>{assessment.progress}%</span>
+                          <span>{progress}%</span>
                         </div>
-                        <Progress value={assessment.progress} className="h-2 rounded-full" />
+                        <Progress value={progress} className="h-2 rounded-full" />
                       </div>
                     ) : (
                       <div className="flex items-center gap-6 text-sm text-muted-foreground font-medium">
-                        <span className="flex items-center gap-2"><Timer className="h-4 w-4 text-primary" /> {assessment.duration}</span>
-                        <span className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> {assessment.numQuestions} Questions</span>
+                        <span className="flex items-center gap-2"><Timer className="h-4 w-4 text-primary" /> {assessment.durationMinutes || 30} mins</span>
+                        <span className="flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> {assessment.questions?.length || 20} Questions</span>
                       </div>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
-                  {assessment.status === 'completed' ? (
+                  {status === 'completed' ? (
                     <Button 
                       variant="outline" 
                       className="h-14 px-8 rounded-2xl border-2 hover:bg-muted font-bold group/btn"
-                      onClick={() => handleViewCertificate(assessment)}
                     >
                       <Award className="h-5 w-5 mr-2 text-primary group-hover/btn:rotate-12 transition-transform" />
                       View Certificate
@@ -529,13 +390,14 @@ export default function StudentAssessments() {
                     <Button 
                       size="lg" 
                       className={`h-14 px-10 rounded-2xl shadow-xl font-black text-lg transition-transform hover:scale-105 active:scale-95 ${
-                        assessment.status === 'in_progress' 
+                        status === 'in_progress' 
                           ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' 
                           : 'bg-primary hover:bg-primary shadow-primary/20'
                       }`}
-                      onClick={() => handleStartTest(assessment)}
+                      onClick={() => handleStartAssessment(assessment._id)}
+                      disabled={isLoading}
                     >
-                      {assessment.status === 'in_progress' ? 'Continue Test' : 'Start Now'}
+                      {status === 'in_progress' ? 'Continue Test' : 'Start Now'}
                       <ArrowRight className="h-5 w-5 ml-2" />
                     </Button>
                   )}
@@ -543,105 +405,10 @@ export default function StudentAssessments() {
               </div>
             </CardContent>
           </Card>
-        ))}
+          )
+        })}
       </div>
 
-      <CertificateModal 
-        isOpen={showCertificate} 
-        onClose={() => setShowCertificate(false)} 
-        assessment={selectedAssessment}
-        userName={user?.name}
-      />
     </div>
-  )
-}
-
-function CertificateModal({ isOpen, onClose, assessment, userName }) {
-  if (!assessment) return null
-
-  const handleDownloadPDF = () => {
-    window.print()
-    toast.success('Use your browser\'s print dialog to save as PDF')
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl border-none p-0 overflow-hidden bg-white dark:bg-slate-900 shadow-[0_0_50px_rgba(0,0,0,0.3)]">
-        <DialogTitle className="sr-only">Certificate of Completion - {assessment.name}</DialogTitle>
-        <DialogDescription className="sr-only">
-          Certificate verifying successful completion of {assessment.name} with a score of {assessment.score}%
-        </DialogDescription>
-        <div className="p-1 bg-primary/10">
-           <div className="border-[12px] border-double border-primary/20 p-8 md:p-16 relative overflow-hidden bg-white dark:bg-slate-950">
-             {/* Decorative Background Elements */}
-             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-             <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-             
-             <div className="relative z-10 text-center space-y-10">
-               <div className="space-y-4">
-                 <div className="flex justify-center mb-6">
-                    <div className="h-20 w-20 bg-primary/10 rounded-full flex items-center justify-center border-4 border-primary/20 relative">
-                       <Award className="h-10 w-10 text-primary" />
-                       <div className="absolute -bottom-2 -right-2 bg-primary text-white p-1 rounded-full shadow-lg">
-                          <CheckCircle2 className="h-4 w-4" />
-                       </div>
-                    </div>
-                 </div>
-                 <h2 className="text-sm font-black uppercase tracking-[0.3em] text-primary/60">Certificate of Completion</h2>
-                 <p className="text-xs font-bold text-muted-foreground">THIS IS TO CERTIFY THAT</p>
-               </div>
-
-               <div>
-                 <h1 className="text-5xl md:text-6xl font-black tracking-tight font-heading text-slate-900 dark:text-white mb-2 print:text-5xl">
-                   {userName}
-                 </h1>
-                 <div className="h-1 w-32 bg-primary/20 mx-auto" />
-               </div>
-
-               <div className="max-w-xl mx-auto space-y-4">
-                 <p className="text-lg text-muted-foreground leading-relaxed">
-                   has successfully completed the professional assessment in
-                 </p>
-                 <h3 className="text-3xl font-black text-slate-800 dark:text-slate-100 italic">
-                   {assessment.name}
-                 </h3>
-                 <p className="text-muted-foreground">
-                   demonstrating exceptional proficiency and command over the subject matter with a verified score of <b>{assessment.score}%</b>.
-                 </p>
-               </div>
-
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-12">
-                 <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
-                   <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Date Issued</p>
-                   <p className="font-bold text-slate-700 dark:text-slate-300">{assessment.date === 'Just now' ? new Date().toLocaleDateString() : assessment.date}</p>
-                 </div>
-                 <div className="flex flex-col items-center justify-center">
-                    <div className="h-24 w-24 border-4 border-primary/30 rounded-full flex items-center justify-center relative rotate-12 shadow-xl bg-white dark:bg-slate-900">
-                       <ShieldCheck className="h-10 w-10 text-primary opacity-50" />
-                       <div className="absolute inset-x-0 text-center text-[10px] font-black uppercase tracking-tighter text-primary/80">
-                         VERIFIED PLATFORM
-                       </div>
-                    </div>
-                 </div>
-                 <div className="space-y-2 border-t border-slate-200 dark:border-slate-800 pt-4">
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Certificate ID</p>
-                    <p className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">CERT-2024-{assessment.id}-SKLLM</p>
-                 </div>
-               </div>
-             </div>
-           </div>
-        </div>
-        <div className="p-4 bg-muted/30 border-t flex justify-between items-center bg-white dark:bg-slate-900">
-           <p className="text-xs text-muted-foreground">This is a digitally verified certificate and does not require a physical signature.</p>
-           <Button 
-             className="font-bold gap-2 rounded-xl h-11 px-6 shadow-lg shadow-primary/20 print:hidden"
-             onClick={handleDownloadPDF}
-           >
-              <Download className="h-4 w-4" />
-              Download PDF
-           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }

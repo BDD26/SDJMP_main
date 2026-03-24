@@ -780,11 +780,6 @@ export default function StudentResumeManager() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
-          <TabsTrigger value="resumes">My Resumes</TabsTrigger>
-          <TabsTrigger value="ats">ATS Score</TabsTrigger>
-        </TabsList>
-
         <TabsContent value="resumes" className="mt-0">
           <Card className="border-none shadow-xl glass overflow-hidden relative">
             <div className="pointer-events-none absolute top-0 right-0 p-8 opacity-5">

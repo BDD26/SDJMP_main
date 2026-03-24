@@ -1,27 +1,69 @@
-import { BarChart3, TrendingUp, FileText, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { BarChart3, TrendingUp, FileText, Clock, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useState, useEffect } from 'react'
+import { dashboardAPI } from '@/services/api'
+import { toast } from 'sonner'
 
-const matchData = [
-  { month: 'Jan', matches: 4, applications: 2 },
-  { month: 'Feb', matches: 3, applications: 2 },
-  { month: 'Mar', matches: 8, applications: 5 },
-  { month: 'Apr', matches: 6, applications: 4 },
-  { month: 'May', matches: 10, applications: 7 },
-]
-
-const recentApplications = [
-  { id: 1, company: 'TechCorp', position: 'React Developer', status: 'Interview', date: '2 days ago' },
-  { id: 2, company: 'StartupXYZ', position: 'Full Stack Dev', status: 'Applied', date: '1 week ago' },
-  { id: 3, company: 'DataFlow', position: 'Backend Engineer', status: 'Rejected', date: '2 weeks ago' },
-]
 
 export default function StudentDashboard() {
   const { user } = useAuth()
+  const [dashboardData, setDashboardData] = useState(null)
+  const [chartData, setChartData] = useState([])
+  const [recentApplications, setRecentApplications] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true)
+        const [statsRes, chartRes, applicationsRes] = await Promise.all([
+          dashboardAPI.getStats(),
+          dashboardAPI.getChartData(),
+          dashboardAPI.getRecentApplications()
+        ])
+        
+        setDashboardData(statsRes)
+        setChartData(chartRes)
+        setRecentApplications(applicationsRes)
+      } catch (err) {
+        setError('Failed to load dashboard data')
+        toast.error('Failed to load dashboard data')
+        console.error('Dashboard error:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <p className="text-lg font-medium">{error}</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div className="space-y-8 animate-fade-in">
@@ -38,43 +80,43 @@ export default function StudentDashboard() {
         <StatCard
           icon={CheckCircle2}
           title="Job Matches"
-          value="24"
-          description="This month"
-          trend="+12%"
+          value={dashboardData?.jobMatches?.toString() || '0'}
+          description="Available positions"
+          trend={dashboardData?.jobMatches > 0 ? 'New matches' : 'No matches'}
         />
         <StatCard
           icon={FileText}
           title="Applications"
-          value="8"
+          value={dashboardData?.activeApplications?.toString() || '0'}
           description="Active"
-          trend="+3"
+          trend={dashboardData?.activeApplications > 0 ? `+${dashboardData.activeApplications}` : 'None'}
         />
         <StatCard
           icon={Clock}
           title="Interviews"
-          value="2"
+          value={dashboardData?.scheduledInterviews?.toString() || '0'}
           description="Scheduled"
-          trend="Next week"
+          trend={dashboardData?.scheduledInterviews > 0 ? 'Upcoming' : 'None scheduled'}
         />
         <StatCard
           icon={TrendingUp}
           title="Profile Strength"
-          value="85%"
-          description="Excellent"
-          trend="+5%"
+          value={`${dashboardData?.profileCompletion || 0}%`}
+          description={dashboardData?.profileCompletion >= 80 ? 'Excellent' : dashboardData?.profileCompletion >= 60 ? 'Good' : 'Needs work'}
+          trend={dashboardData?.profileCompletion > 85 ? '+5%' : dashboardData?.profileCompletion === 85 ? 'Complete' : 'Improve'}
         />
       </div>
 
-      {/* Charts and Details */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-none shadow-xl glass hover:shadow-2xl transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Matches & Applications Trend</CardTitle>
-            <CardDescription>Last 5 months activity</CardDescription>
-          </CardHeader>
-          <CardContent>
+      {/* Charts Section - Full Width */}
+      <Card className="border-none shadow-xl glass hover:shadow-2xl transition-all duration-300">
+        <CardHeader>
+          <CardTitle>Activity Overview</CardTitle>
+          <CardDescription>Last 6 months of applications and job matches</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={matchData}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -84,26 +126,17 @@ export default function StudentDashboard() {
                 <Bar dataKey="applications" fill="#10b981" name="Applications" />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="border-none shadow-xl glass hover:shadow-2xl transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/student/jobs">Browse Jobs</Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/student/assessments">Take Assessment</Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/student/profile">Update Profile</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="text-center">
+                <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No activity data available yet</p>
+                <p className="text-sm">Start applying to jobs to see your activity trends</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Applications */}
       <Card className="border-none shadow-xl glass hover:shadow-2xl transition-all duration-300">
@@ -112,30 +145,42 @@ export default function StudentDashboard() {
           <CardDescription>Your latest job applications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentApplications.map((app) => (
-              <Link
-                key={app.id}
-                to="/student/applications"
-                className="flex items-center justify-between p-4 border rounded-2xl bg-background/50 hover:bg-background transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer block"
-              >
-                <div className="flex-1">
-                  <h4 className="font-bold">{app.position}</h4>
-                  <p className="text-sm text-muted-foreground">{app.company}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <Badge className="font-bold" variant={
-                    app.status === 'Interview' ? 'default' :
-                    app.status === 'Applied' ? 'secondary' :
-                    'destructive'
-                  }>
-                    {app.status}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground font-medium">{app.date}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          {recentApplications.length > 0 ? (
+            <div className="space-y-4">
+              {recentApplications.map((app) => (
+                <Link
+                  key={app.id}
+                  to="/student/applications"
+                  className="flex items-center justify-between p-4 border rounded-2xl bg-background/50 hover:bg-background transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer block"
+                >
+                  <div className="flex-1">
+                    <h4 className="font-bold">{app.position}</h4>
+                    <p className="text-sm text-muted-foreground">{app.company}</p>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <Badge className="font-bold" variant={
+                      app.status === 'interview' ? 'default' :
+                      app.status === 'applied' ? 'secondary' :
+                      app.status === 'accepted' ? 'default' :
+                      'destructive'
+                    }>
+                      {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                    </Badge>
+                    <p className="text-xs text-muted-foreground font-medium">{app.date}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <FileText className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">No applications yet</p>
+              <p className="text-sm text-muted-foreground mt-2">Start browsing jobs to submit your first application</p>
+              <Button asChild className="mt-4">
+                <Link to="/student/jobs">Browse Jobs</Link>
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

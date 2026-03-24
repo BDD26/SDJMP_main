@@ -43,7 +43,7 @@ export default function StudentJobSearch() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Job Opportunities</h1>
-        <p className="text-muted-foreground mt-2">Personalized jobs based on your skills</p>
+        <p className="text-muted-foreground mt-2">Jobs matched to your profile and preferences</p>
       </div>
 
       <div className="relative">
@@ -62,7 +62,7 @@ export default function StudentJobSearch() {
 
       <div className="grid gap-4">
         {isLoading ? (
-          <div className="py-12 text-center text-muted-foreground animate-pulse">Analyzing matches...</div>
+          <div className="py-12 text-center text-muted-foreground animate-pulse">Finding matches...</div>
         ) : filteredJobs.map((job) => {
           const displayJob = job || {}
           const matchScore = job.matchScore || 0
@@ -106,7 +106,7 @@ export default function StudentJobSearch() {
               <div className="flex justify-end pt-4 border-t">
                 <Button asChild>
                   <Link to={jobId ? `/jobs/${jobId}` : '/student/jobs'}>
-                    View Match Analysis
+                    View Details
                     <ChevronRight className="h-4 w-4 ml-1" />
                   </Link>
                 </Button>

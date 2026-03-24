@@ -144,6 +144,7 @@ export const skillsAPI = {
 export const assessmentsAPI = {
   getAll: () => apiRequest('/assessments'),
   getById: (id) => apiRequest(`/assessments/${id}`),
+  getQuestions: (id) => apiRequest(`/assessments/${id}/questions`),
   startAssessment: (id) => apiRequest(`/assessments/${id}/start`, { method: 'post' }),
   submitAnswer: (assessmentId, questionId, answer) =>
     apiRequest(`/assessments/${assessmentId}/answer`, {
@@ -214,6 +215,12 @@ export const notificationsAPI = {
     }),
 }
 
+export const dashboardAPI = {
+  getStats: () => apiRequest('/student/dashboard/stats'),
+  getChartData: () => apiRequest('/student/dashboard/chart-data'),
+  getRecentApplications: () => apiRequest('/student/dashboard/recent-applications'),
+}
+
 export default {
   auth: authAPI,
   user: userAPI,
@@ -224,4 +231,5 @@ export default {
   employer: employerAPI,
   admin: adminAPI,
   notifications: notificationsAPI,
+  dashboard: dashboardAPI,
 }

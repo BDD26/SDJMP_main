@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Bell, 
@@ -6,10 +6,22 @@ import {
   ClipboardList, 
   Trash2, 
   AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Settings,
+  Archive
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from '@/components/ui/dropdown-menu'
 import { useNotifications } from '@/context/NotificationContext'
 import { toast } from 'sonner'
 
@@ -17,52 +29,145 @@ export default function StudentNotifications() {
   const navigate = useNavigate()
   const { notifications, markAsRead, markAllAsRead, removeNotification, formatRelativeTime } = useNotifications()
   const [filter, setFilter] = useState('all')
+  const [isLoading, setIsLoading] = useState(false)
 
-  const filteredNotifications = notifications.filter(n => {
-    if (filter === 'all') return true
-    if (filter === 'unread') return !n.read
-    return n.type === filter
-  })
+  // Memoized filtered notifications for performance
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter(n => {
+      if (filter === 'all') return true
+      if (filter === 'unread') return !n.read
+      return n.type === filter
+    })
+  }, [notifications, filter])
 
-  const getIcon = (type) => {
+  // Memoized notification stats
+  const notificationStats = useMemo(() => {
+    const stats = {
+      total: notifications.length,
+      unread: notifications.filter(n => !n.read).length,
+      jobs: notifications.filter(n => n.type === 'job').length,
+      assessments: notifications.filter(n => n.type === 'assessment').length,
+      system: notifications.filter(n => n.type === 'system').length,
+    }
+    return stats
+  }, [notifications])
+
+  // Optimized icon function with memoization
+  const getIcon = useCallback((type) => {
     switch (type) {
       case 'job': return <Briefcase className="h-4 w-4 text-blue-500" />
       case 'assessment': return <ClipboardList className="h-4 w-4 text-purple-500" />
       case 'system': return <AlertCircle className="h-4 w-4 text-amber-500" />
       default: return <Bell className="h-4 w-4 text-primary" />
     }
-  }
+  }, [])
 
-  const handleDelete = (id) => {
-    removeNotification(id)
-    toast.success('Notification deleted')
-  }
+  // Optimized handlers with error handling
+  const handleDelete = useCallback(async (id) => {
+    try {
+      removeNotification(id)
+      toast.success('Notification deleted')
+    } catch (error) {
+      toast.error('Failed to delete notification')
+    }
+  }, [removeNotification])
 
-  const handleViewDetails = (notification) => {
+  const handleMarkAllAsRead = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      markAllAsRead()
+      toast.success('All notifications marked as read')
+    } catch (error) {
+      toast.error('Failed to mark notifications as read')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [markAllAsRead])
+
+  const handleViewDetails = useCallback((notification) => {
     markAsRead(notification.id)
     if (notification.type === 'job') navigate('/student/jobs')
     else if (notification.type === 'assessment') navigate('/student/assessments')
     else navigate('/student/applications')
-  }
+  }, [markAsRead, navigate])
+
+  const handleArchiveAll = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      // Archive all read notifications
+      const readNotifications = notifications.filter(n => n.read)
+      readNotifications.forEach(n => removeNotification(n.id))
+      toast.success(`${readNotifications.length} notifications archived`)
+    } catch (error) {
+      toast.error('Failed to archive notifications')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [notifications, removeNotification])
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Notifications</h1>
           <p className="text-muted-foreground mt-1">Stay updated on your job applications and assessments.</p>
         </div>
-        <Button variant="outline" onClick={markAllAsRead} className="rounded-xl">
-          Mark all as read
-        </Button>
+        <div className="flex items-center gap-2">
+          {notificationStats.unread > 0 && (
+            <Badge variant="secondary" className="px-3 py-1">
+              {notificationStats.unread} unread
+            </Badge>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={isLoading}>
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleMarkAllAsRead} disabled={isLoading}>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Mark all as read
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleArchiveAll} disabled={isLoading}>
+                <Archive className="h-4 w-4 mr-2" />
+                Archive read notifications
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold">{notificationStats.total}</div>
+          <div className="text-sm text-muted-foreground">Total</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold text-blue-600">{notificationStats.unread}</div>
+          <div className="text-sm text-muted-foreground">Unread</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold text-green-600">{notificationStats.jobs}</div>
+          <div className="text-sm text-muted-foreground">Jobs</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold text-purple-600">{notificationStats.assessments}</div>
+          <div className="text-sm text-muted-foreground">Assessments</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-2xl font-bold text-amber-600">{notificationStats.system}</div>
+          <div className="text-sm text-muted-foreground">System</div>
+        </Card>
       </div>
 
       <Tabs defaultValue="all" value={filter} onValueChange={setFilter} className="w-full">
         <TabsList className="bg-muted/50 p-1 mb-6">
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="unread">Unread</TabsTrigger>
-          <TabsTrigger value="job">Jobs</TabsTrigger>
-          <TabsTrigger value="assessment">Assessments</TabsTrigger>
+          <TabsTrigger value="all">All ({notificationStats.total})</TabsTrigger>
+          <TabsTrigger value="unread">Unread ({notificationStats.unread})</TabsTrigger>
+          <TabsTrigger value="job">Jobs ({notificationStats.jobs})</TabsTrigger>
+          <TabsTrigger value="assessment">Assessments ({notificationStats.assessments})</TabsTrigger>
         </TabsList>
 
         <Card className="border-none shadow-xl glass overflow-hidden">
@@ -91,7 +196,7 @@ export default function StudentNotifications() {
                           {formatRelativeTime(notification.timestamp)}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-3">{notification.message}</p>
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{notification.message}</p>
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="outline" 
@@ -124,8 +229,13 @@ export default function StudentNotifications() {
                   <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
                     <Bell className="h-10 w-10 text-muted-foreground opacity-20" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">Clear Skies!</h3>
-                  <p className="text-muted-foreground">You don&apos;t have any notifications in this category.</p>
+                  <h3 className="text-xl font-bold mb-2">All caught up!</h3>
+                  <p className="text-muted-foreground">
+                    {filter === 'all' 
+                      ? "You don't have any notifications yet."
+                      : `No ${filter} notifications found.`
+                    }
+                  </p>
                 </div>
               )}
             </div>

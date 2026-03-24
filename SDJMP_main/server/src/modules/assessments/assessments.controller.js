@@ -114,6 +114,39 @@ export async function getAssessmentResults(req, res) {
   res.status(200).json(studentAssessment)
 }
 
+export async function getAssessmentQuestions(req, res) {
+  const assessment = await Assessment.findById(req.params.assessmentId)
+  if (!assessment) throw createHttpError(404, 'Assessment not found')
+  
+  // Check if student has started this assessment
+  const studentAssessment = await StudentAssessment.findOne({
+    studentId: req.user._id,
+    assessmentId: assessment._id
+  })
+  
+  if (!studentAssessment) {
+    throw createHttpError(400, 'Please start the assessment first')
+  }
+  
+  if (studentAssessment.status === 'completed') {
+    throw createHttpError(400, 'Assessment already completed')
+  }
+
+  // Return questions with current answers
+  const questionsWithAnswers = assessment.questions.map(q => ({
+    ...q.toObject ? q.toObject() : q,
+    studentAnswer: studentAssessment.answers[q._id ? q._id.toString() : q.id]
+  }))
+
+  res.status(200).json({
+    assessmentId: assessment._id,
+    title: assessment.title,
+    durationMinutes: assessment.durationMinutes || 30,
+    questions: questionsWithAnswers,
+    currentProgress: studentAssessment.progress || 0
+  })
+}
+
 export async function getMyAssessmentResults(req, res) {
   const results = await StudentAssessment.find({ studentId: req.user._id })
     .populate('assessmentId')
