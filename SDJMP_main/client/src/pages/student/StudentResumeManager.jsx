@@ -36,7 +36,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -489,10 +488,9 @@ function createResumePdfFile(data, user, name) {
 }
 
 export default function StudentResumeManager() {
-  const { user } = useAuth()
+  const { user, refreshSession } = useAuth()
   const fileInputRef = useRef(null)
   
-  const [activeTab, setActiveTab] = useState('resumes')
   const [resumes, setResumes] = useState([])
   const [isUploading, setIsUploading] = useState(false)
   const [isLoadingResumes, setIsLoadingResumes] = useState(true)
@@ -575,8 +573,13 @@ export default function StudentResumeManager() {
           storageProvider: 'cloudinary',
         }
       })
-      toast.success('Resume uploaded successfully')
+      toast.success('Resume uploaded successfully! Any detected skills have been added.')
       fetchResumes()
+      
+      // Refresh Auth session so profile skills instantly show up without a page refresh
+      if (typeof refreshSession === 'function') {
+        refreshSession()
+      }
     } catch (error) {
        toast.error(error?.message || 'Upload failed')
     } finally {
@@ -779,8 +782,7 @@ export default function StudentResumeManager() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsContent value="resumes" className="mt-0">
+      <div className="w-full">
           <Card className="border-none shadow-xl glass overflow-hidden relative">
             <div className="pointer-events-none absolute top-0 right-0 p-8 opacity-5">
               <FileText className="h-32 w-32" />
@@ -914,48 +916,7 @@ export default function StudentResumeManager() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="ats" className="mt-0">
-          <Card className="border-none shadow-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white overflow-hidden relative">
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.08\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-60" />
-            <CardHeader className="relative z-10">
-              <CardTitle className="text-2xl">ATS Optimization</CardTitle>
-              <CardDescription className="text-white/80">Compatibility with employer applicant tracking systems.</CardDescription>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <div className="flex flex-col md:flex-row items-center gap-8">
-                <div className="h-36 w-36 rounded-full border-4 border-white/30 flex items-center justify-center relative shrink-0">
-                  <span className="text-4xl font-black">82</span>
-                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-emerald-400 text-slate-900 text-xs font-bold px-3 py-1 rounded-full">Good</span>
-                  <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="8" />
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="white" strokeWidth="8" strokeDasharray="283" strokeDashoffset="51" strokeLinecap="round" />
-                  </svg>
-                </div>
-                <div className="flex-1 grid grid-cols-2 gap-4">
-                  <div className="bg-white/15 backdrop-blur p-4 rounded-xl border border-white/20">
-                    <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Keywords</p>
-                    <p className="text-xl font-bold">Excellent</p>
-                  </div>
-                  <div className="bg-white/15 backdrop-blur p-4 rounded-xl border border-white/20">
-                    <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Formatting</p>
-                    <p className="text-xl font-bold">Good</p>
-                  </div>
-                  <div className="bg-white/15 backdrop-blur p-4 rounded-xl border border-white/20">
-                    <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Sections</p>
-                    <p className="text-xl font-bold">Complete</p>
-                  </div>
-                  <div className="bg-white/15 backdrop-blur p-4 rounded-xl border border-white/20">
-                    <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-1">Length</p>
-                    <p className="text-xl font-bold">Optimal</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Rename Dialog */}
       <Dialog open={showRename} onOpenChange={setShowRename}>

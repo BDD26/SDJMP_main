@@ -160,14 +160,13 @@ export async function deleteJob(req, res) {
   })
 }
 
+import { calculateMatchScore } from './matching.service.js'
+
 export async function getStudentMatches(req, res) {
-  const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 })
+  const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 }).lean()
   
   const userProfile = req.user.profile || {}
-  const userSkills = (userProfile.skills || []).map(s => {
-    if (typeof s === 'string') return s.toLowerCase()
-    return s.name ? s.name.toLowerCase() : ''
-  }).filter(Boolean)
+  const userSkills = userProfile.skills || []
 
   const preferredLocations = (userProfile.preferences?.locations || []).map(l => {
     if (typeof l === 'string') return l.toLowerCase()
@@ -180,30 +179,31 @@ export async function getStudentMatches(req, res) {
   }).filter(Boolean)
 
   const matches = jobs.map(job => {
-    const jobSkills = (job.skills || []).map(s => s.toLowerCase())
-    
-    let skillMatchScore = 0
-    if (jobSkills.length > 0) {
-      const overlap = jobSkills.filter(js => userSkills.includes(js)).length
-      skillMatchScore = Math.round((overlap / jobSkills.length) * 100)
-    } else {
-      skillMatchScore = 50 
-    }
+    // Both skills array and skillRequirements are considered
+    const combinedJobReqs = [
+      ...(job.skills || []).map(s => ({ name: s, weight: 10 })),
+      ...(job.skillRequirements || [])
+    ]
 
+    const skillMatchScore = calculateMatchScore(userSkills, combinedJobReqs)
+
+    // Calculate composite score (70% Skills, 15% Location, 15% Job Type)
     let matchScore = skillMatchScore * 0.7
 
     if (preferredLocations.length > 0 && job.location) {
       const jobLoc = job.location.toLowerCase()
       const locMatch = preferredLocations.some(l => jobLoc.includes(l) || (l.includes('remote') && jobLoc.includes('remote')))
       if (locMatch) matchScore += 15
-    } else {
+    } else if (preferredLocations.length === 0) {
+      // If user has no preference, don't penalize entirely
       matchScore += 10
     }
 
     if (preferredJobTypes.length > 0 && job.type) {
       const typeMatch = preferredJobTypes.includes(job.type.toLowerCase())
       if (typeMatch) matchScore += 15
-    } else {
+    } else if (preferredJobTypes.length === 0) {
+      // If user has no preference, don't penalize entirely 
       matchScore += 10
     }
 
@@ -215,6 +215,7 @@ export async function getStudentMatches(req, res) {
     }
   })
 
+  // Sort all jobs by match score, best matches first
   matches.sort((a, b) => b.matchScore - a.matchScore)
 
   res.status(200).json(matches)

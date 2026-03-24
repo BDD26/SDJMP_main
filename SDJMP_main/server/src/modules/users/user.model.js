@@ -47,6 +47,7 @@ const userSchema = new mongoose.Schema(
             default: 'intermediate'
           },
           years: { type: Number, default: 0 },
+          verified: { type: Boolean, default: false },
         },
       ],
       projects: [
