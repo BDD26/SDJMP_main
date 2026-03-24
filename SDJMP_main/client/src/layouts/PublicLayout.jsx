@@ -7,8 +7,10 @@ import {
   X,
   ChevronRight,
   Building2,
-  Users,
   Award,
+  Target,
+  Shield,
+  ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
@@ -151,48 +153,65 @@ export default function PublicLayout() {
                 <span className="text-lg font-bold">SkillMatch</span>
               </Link>
               <p className="text-sm text-muted-foreground">
-                Connecting talented students with top employers through skill-based matching.
+                Connecting talented students with top employers through skill-based discovery.
               </p>
             </div>
 
-            {/* For Students */}
+            {/* General Resources (For Todos/Guest/Students) */}
             <div>
               <h4 className="font-semibold mb-4 flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                For Students
-              </h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/jobs" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Browse Jobs</Link></li>
-                <li><Link to="/skills" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Skills Library</Link></li>
-                <li><Link to="/register" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Create Profile</Link></li>
-              </ul>
-            </div>
-
-            {/* For Employers */}
-            <div>
-              <h4 className="font-semibold mb-4 flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                For Employers
-              </h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link to="/register" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Post Jobs</Link></li>
-                <li><Link to="/about" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Find Talent</Link></li>
-                <li><Link to="/about" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Pricing</Link></li>
-              </ul>
-            </div>
-
-            {/* Company */}
-            <div>
-              <h4 className="font-semibold mb-4 flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Company
+                <Target className="h-4 w-4" />
+                Resources
               </h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link to="/about" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">About Us</Link></li>
                 <li><Link to="/about" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Contact</Link></li>
-                <li><Link to="/about" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Privacy Policy</Link></li>
+                <li><Link to="#" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Privacy Policy</Link></li>
               </ul>
             </div>
+
+            {/* Role Specific Navigation */}
+            {(!user || user.role === 'student') && (
+              <div>
+                <h4 className="font-semibold mb-4 flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  For Students
+                </h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li><Link to="/jobs" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Browse Jobs</Link></li>
+                  <li><Link to="/skills" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Skills Library</Link></li>
+                  {!user && <li><Link to="/register" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Create Profile</Link></li>}
+                  {user && <li><Link to="/student/profile" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">My Profile</Link></li>}
+                </ul>
+              </div>
+            )}
+
+            {user?.role === 'employer' && (
+              <div>
+                <h4 className="font-semibold mb-4 flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Employer Tools
+                </h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li><Link to="/employer/jobs/new" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Post a Job</Link></li>
+                  <li><Link to="/employer/applicants" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Review Applicants</Link></li>
+                  <li><Link to="/employer/company" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Company Profile</Link></li>
+                </ul>
+              </div>
+            )}
+
+            {user?.role === 'admin' && (
+              <div>
+                <h4 className="font-semibold mb-4 flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Admin Portal
+                </h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li><Link to="/admin" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Dashboard</Link></li>
+                  <li><Link to="/admin/platform-settings" className="hover:text-foreground hover:translate-x-1 inline-block transition-transform duration-300">Platform Settings</Link></li>
+                </ul>
+              </div>
+            )}
           </div>
 
           <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center gap-4">

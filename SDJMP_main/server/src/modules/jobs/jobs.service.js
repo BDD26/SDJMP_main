@@ -12,6 +12,7 @@ export function serializeJob(jobDocument) {
     salary: job.salary || '',
     description: job.description || '',
     skills: job.skills || [],
+    skillRequirements: job.skillRequirements || [],
     requirements: job.requirements || [],
     deadline: job.deadline,
     status: job.status,

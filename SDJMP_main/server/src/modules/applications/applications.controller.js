@@ -3,6 +3,7 @@ import Job from '../jobs/job.model.js'
 import Resume from '../users/resume.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { serializeApplication } from './applications.service.js'
+import { computeMatchScore, formatRelative } from '../employer/employer.controller.js'
 
 function canManageApplication(application, user) {
   if (user.role === 'super_admin') {
@@ -116,8 +117,58 @@ export async function getApplicationsForJob(req, res) {
     .populate('jobId')
     .populate('studentId', 'name email avatar profile')
     .sort({ createdAt: -1 })
+    .lean()
 
-  res.status(200).json(applications.map(serializeApplication))
+  const result = applications.map((app) => {
+    const matchData = computeMatchScore(app)
+    return {
+      id: String(app._id),
+      name: app.studentId?.name || 'Unknown',
+      email: app.studentId?.email || '',
+      avatar: app.studentId?.avatar || '',
+      position: job.title || 'Unknown Position',
+      status: app.status,
+      appliedDate: formatRelative(app.createdAt),
+      notes: app.notes || '',
+      interview: app.interview || null,
+      coverLetter: app.coverLetter || '',
+      matchScore: matchData.score,
+      matchedSkills: matchData.matchedSkills,
+      missingSkills: matchData.missingSkills,
+      jobId: String(job._id),
+    }
+  })
+
+  res.status(200).json(result)
+}
+
+export async function updateInterviewStatus(req, res) {
+  const application = await Application.findById(req.params.applicationId)
+
+  if (!application) {
+    throw createHttpError(404, 'Application not found')
+  }
+
+  if (req.user.role === 'student' || String(application.employerId) !== String(req.user._id)) {
+    throw createHttpError(403, 'You do not have access to this application')
+  }
+
+  const { status } = req.body
+  if (!['scheduled', 'completed', 'cancelled'].includes(status)) {
+    throw createHttpError(400, 'Invalid interview status')
+  }
+
+  if (!application.interview) {
+    throw createHttpError(400, 'No interview scheduled for this application')
+  }
+
+  application.interview.status = status
+  await application.save()
+
+  const populated = await Application.findById(application._id)
+    .populate('jobId')
+    .populate('studentId', 'name email avatar profile')
+  res.status(200).json(serializeApplication(populated))
 }
 
 export async function withdrawApplication(req, res) {

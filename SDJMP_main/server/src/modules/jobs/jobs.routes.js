@@ -7,6 +7,7 @@ import {
   deleteJob,
   getJobById,
   getRecommendedJobs,
+  getEmployerJobs,
   listJobs,
   searchJobs,
   updateJob,
@@ -19,6 +20,12 @@ const jobsRouter = Router()
 jobsRouter.get('/', asyncHandler(listJobs))
 jobsRouter.get('/recommended', asyncHandler(getRecommendedJobs))
 jobsRouter.get('/search', asyncHandler(searchJobs))
+jobsRouter.get(
+  '/my',
+  requireAuth,
+  requireRole(['employer', 'super_admin']),
+  asyncHandler(getEmployerJobs)
+)
 
 jobsRouter.get(
   '/student/matches',

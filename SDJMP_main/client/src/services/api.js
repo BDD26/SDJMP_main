@@ -101,6 +101,7 @@ export const userAPI = {
 export const jobsAPI = {
   getAll: (params = {}) => apiRequest(`/jobs${buildQueryString(params)}`),
   getById: (id) => apiRequest(`/jobs/${id}`),
+  getMyJobs: () => apiRequest('/jobs/my'),
   create: (jobData) => apiRequest('/jobs', { method: 'post', body: jobData }),
   update: (id, jobData) => apiRequest(`/jobs/${id}`, { method: 'put', body: jobData }),
   delete: (id) => apiRequest(`/jobs/${id}`, { method: 'delete' }),
@@ -164,11 +165,18 @@ export const employerAPI = {
       body: data,
     }),
   getStats: () => apiRequest('/employer/stats'),
-  getApplicants: (jobId) => apiRequest(`/employer/applicants/${jobId}`),
+  getApplicants: (jobId) => apiRequest(`/employer/applicants/${jobId || 'all'}`),
+  getAllApplicants: () => apiRequest('/employer/applicants/all'),
+  getInterviews: () => apiRequest('/employer/interviews'),
   scheduleInterview: (applicationId, interviewData) =>
     apiRequest(`/employer/interview/${applicationId}`, {
       method: 'post',
       body: interviewData,
+    }),
+  updateInterviewStatus: (applicationId, status) =>
+    apiRequest(`/applications/${applicationId}/interview-status`, {
+      method: 'put',
+      body: { status },
     }),
 }
 

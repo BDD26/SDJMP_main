@@ -7,6 +7,7 @@ import {
   getApplicationsForJob,
   getMyApplications,
   updateApplicationStatus,
+  updateInterviewStatus,
   withdrawApplication,
 } from './applications.controller.js'
 import {
@@ -40,6 +41,11 @@ applicationsRouter.put(
   requireRole(['employer', 'super_admin']),
   validate(updateApplicationStatusSchema),
   asyncHandler(updateApplicationStatus)
+)
+applicationsRouter.put(
+  '/:applicationId/interview-status',
+  requireRole(['employer', 'super_admin']),
+  asyncHandler(updateInterviewStatus)
 )
 
 export default applicationsRouter
