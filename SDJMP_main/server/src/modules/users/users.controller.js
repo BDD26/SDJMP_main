@@ -186,6 +186,17 @@ export async function createResume(req, res) {
     atsScore: type === 'built' ? 85 : 0
   })
 
+  // Trigger skill extraction if it's an uploaded PDF
+  // We await this so the frontend can immediately fetch the updated user profile
+  if (type === 'uploaded' && fileUrl) {
+    try {
+      const { processResumeForUser } = await import('./resume.service.js')
+      await processResumeForUser(req.user._id, fileUrl, data?.mimeType || 'application/pdf')
+    } catch (err) {
+      console.error('Failed to load resume service or parse document', err)
+    }
+  }
+
   res.status(201).json({ resume: newResume })
 }
 
