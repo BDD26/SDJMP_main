@@ -2,6 +2,7 @@ import User from './user.model.js'
 import Resume from './resume.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { comparePassword, hashPassword, sanitizeUser } from '../auth/auth.service.js'
+import { destroyCloudinaryRawAsset } from '../../utils/cloudinary.js'
 
 export async function getProfile(req, res) {
   res.status(200).json({
@@ -76,7 +77,14 @@ export async function getResumes(req, res) {
 }
 
 export async function createResume(req, res) {
-  const { name, type, fileUrl, data } = req.validated.body
+  const {
+    name,
+    type,
+    fileUrl,
+    filePublicId,
+    storageProvider,
+    data,
+  } = req.validated.body
   
   const existingCount = await Resume.countDocuments({ studentId: req.user._id })
   const isPrimary = existingCount === 0
@@ -86,6 +94,8 @@ export async function createResume(req, res) {
     name,
     type,
     fileUrl,
+    filePublicId,
+    storageProvider: storageProvider || (fileUrl ? 'cloudinary' : 'none'),
     data,
     isPrimary,
     status: type === 'built' ? 'verified' : 'pending',
@@ -118,6 +128,14 @@ export async function deleteResume(req, res) {
 
   const resume = await Resume.findOneAndDelete({ _id: id, studentId: req.user._id })
   if (!resume) throw createHttpError(404, 'Resume not found')
+
+  if (resume.filePublicId && resume.storageProvider === 'cloudinary') {
+    try {
+      await destroyCloudinaryRawAsset(resume.filePublicId)
+    } catch (error) {
+      console.warn('Failed to delete Cloudinary resume asset', error)
+    }
+  }
 
   if (resume.isPrimary) {
     const nextResume = await Resume.findOne({ studentId: req.user._id }).sort({ createdAt: -1 })

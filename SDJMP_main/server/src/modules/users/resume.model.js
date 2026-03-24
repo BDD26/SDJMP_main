@@ -22,6 +22,15 @@ const resumeSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    filePublicId: {
+      type: String,
+      default: '',
+    },
+    storageProvider: {
+      type: String,
+      enum: ['cloudinary', 'local', 'none'],
+      default: 'none',
+    },
     data: {
       type: mongoose.Schema.Types.Mixed,
       default: null,

@@ -46,6 +46,7 @@ import {
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/services/api'
+import { uploadResumeAsset } from '@/shared/api/cloudinary'
 
 const DEFAULT_RESUME_DATA = {
   fullName: '',
@@ -57,15 +58,6 @@ const DEFAULT_RESUME_DATA = {
   education: [],
   experience: [],
   projects: [],
-}
-
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsDataURL(file)
-  })
 }
 
 function escapeHtml(value = '') {
@@ -481,6 +473,21 @@ function buildResumePdfBlob(data = {}, user = null) {
   return new Blob([pdf], { type: 'application/pdf' })
 }
 
+function sanitizeResumePublicIdSegment(value = '') {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function createResumePdfFile(data, user, name) {
+  const pdfBlob = buildResumePdfBlob(data, user)
+  return new File([pdfBlob], normalizeResumeFileName(name, 'pdf'), {
+    type: 'application/pdf',
+  })
+}
+
 export default function StudentResumeManager() {
   const { user } = useAuth()
   const fileInputRef = useRef(null)
@@ -550,22 +557,28 @@ export default function StudentResumeManager() {
     }
     setIsUploading(true)
     try {
-      const fileUrl = await readFileAsDataUrl(file)
+      const uploadedAsset = await uploadResumeAsset(file, {
+        publicId: `uploaded-${Date.now()}-${sanitizeResumePublicIdSegment(file.name)}`,
+      })
 
       await api.user.createResume({
         name: file.name,
         type: 'uploaded',
-        fileUrl,
+        fileUrl: uploadedAsset.fileUrl,
+        filePublicId: uploadedAsset.filePublicId,
+        storageProvider: 'cloudinary',
         data: {
           mimeType: file.type,
           originalName: file.name,
-          size: file.size,
+          size: uploadedAsset.bytes || file.size,
+          resourceType: uploadedAsset.resourceType,
+          storageProvider: 'cloudinary',
         }
       })
       toast.success('Resume uploaded successfully')
       fetchResumes()
     } catch (error) {
-       toast.error('Upload failed')
+       toast.error(error?.message || 'Upload failed')
     } finally {
        setIsUploading(false)
        e.target.value = ''
@@ -573,13 +586,27 @@ export default function StudentResumeManager() {
   }
 
   const handleSaveBuiltResume = async () => {
-    const name = `${resumeData.fullName.replace(/\s+/g, '_')}_Resume.pdf`
+    const baseName = resumeData.fullName.trim() || user?.name || 'student'
+    const name = `${baseName.replace(/\s+/g, '_')}_Resume.pdf`
     try {
+      const pdfFile = createResumePdfFile(resumeData, user, name)
+      const uploadedAsset = await uploadResumeAsset(pdfFile, {
+        publicId: `built-${Date.now()}-${sanitizeResumePublicIdSegment(baseName)}`,
+        fileName: name,
+      })
+
       await api.user.createResume({
         name,
         type: 'built',
-        fileUrl: '',
-        data: resumeData
+        fileUrl: uploadedAsset.fileUrl,
+        filePublicId: uploadedAsset.filePublicId,
+        storageProvider: 'cloudinary',
+        data: {
+          ...resumeData,
+          mimeType: 'application/pdf',
+          size: uploadedAsset.bytes || pdfFile.size,
+          storageProvider: 'cloudinary',
+        }
       })
       setShowBuilder(false)
       setBuilderStep(1)
@@ -620,6 +647,15 @@ export default function StudentResumeManager() {
   }
 
   const handleDownload = (resume) => {
+    if (resume.fileUrl) {
+      triggerDownload({
+        href: resume.fileUrl,
+        filename: normalizeResumeFileName(resume.name, 'pdf'),
+      })
+      toast.success(`Downloading ${resume.name}...`)
+      return
+    }
+
     if (resume.type === 'built') {
       try {
         const pdfBlob = buildResumePdfBlob(resume.data || resumeData, user)
@@ -633,15 +669,6 @@ export default function StudentResumeManager() {
       } catch (error) {
         toast.error('Failed to generate resume PDF')
       }
-      return
-    }
-
-    if (resume.fileUrl) {
-      triggerDownload({
-        href: resume.fileUrl,
-        filename: resume.name || 'resume',
-      })
-      toast.success(`Downloading ${resume.name}...`)
       return
     }
 

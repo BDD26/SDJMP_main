@@ -53,6 +53,8 @@ export const createResumeSchema = z.object({
     name: z.string().trim().min(1),
     type: z.enum(['uploaded', 'built']),
     fileUrl: z.string().optional(),
+    filePublicId: z.string().optional(),
+    storageProvider: z.enum(['cloudinary', 'local', 'none']).optional(),
     data: z.record(z.any()).nullable().optional(),
   }),
   params: z.object({}).optional(),

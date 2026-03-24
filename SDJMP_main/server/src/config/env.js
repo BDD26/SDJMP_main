@@ -13,6 +13,9 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === 'true'),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
   SEED_STUDENT_EMAIL: z.string().email().optional(),
   SEED_STUDENT_PASSWORD: z.string().min(8).optional(),
   SEED_EMPLOYER_EMAIL: z.string().email().optional(),
@@ -33,6 +36,9 @@ const env = {
   cookieName: parsedEnv.COOKIE_NAME,
   cookieSecure: parsedEnv.COOKIE_SECURE,
   isProduction: parsedEnv.NODE_ENV === 'production',
+  cloudinaryCloudName: parsedEnv.CLOUDINARY_CLOUD_NAME || '',
+  cloudinaryApiKey: parsedEnv.CLOUDINARY_API_KEY || '',
+  cloudinaryApiSecret: parsedEnv.CLOUDINARY_API_SECRET || '',
   seedStudentEmail: parsedEnv.SEED_STUDENT_EMAIL,
   seedStudentPassword: parsedEnv.SEED_STUDENT_PASSWORD,
   seedEmployerEmail: parsedEnv.SEED_EMPLOYER_EMAIL,
