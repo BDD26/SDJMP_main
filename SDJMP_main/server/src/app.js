@@ -11,6 +11,8 @@ import adminRouter from './modules/admin/admin.routes.js'
 import applicationsRouter from './modules/applications/applications.routes.js'
 import assessmentsRouter from './modules/assessments/assessments.routes.js'
 import authRouter from './modules/auth/auth.routes.js'
+import dashboardRouter from './modules/student/dashboard.routes.js'
+import debugRouter from './modules/student/debug.routes.js'
 import employerRouter from './modules/employer/employer.routes.js'
 import healthRouter from './modules/health/health.routes.js'
 import jobsRouter from './modules/jobs/jobs.routes.js'
@@ -69,6 +71,8 @@ app.use('/api/assessments', assessmentsRouter)
 app.use('/api/notifications', notificationsRouter)
 app.use('/api/employer', employerRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/student/dashboard', dashboardRouter)
+app.use('/api/student/debug', debugRouter)
 
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

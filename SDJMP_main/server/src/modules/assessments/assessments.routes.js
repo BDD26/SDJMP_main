@@ -4,6 +4,7 @@ import {
   completeAssessment,
   getAllAssessments,
   getAssessmentById,
+  getAssessmentQuestions,
   getAssessmentResults,
   getMyAssessmentResults,
   startAssessment,
@@ -16,6 +17,7 @@ const assessmentsRouter = Router()
 assessmentsRouter.get('/', asyncHandler(getAllAssessments))
 assessmentsRouter.get('/my-results', requireAuth, requireRole(['student']), asyncHandler(getMyAssessmentResults))
 assessmentsRouter.get('/:assessmentId', asyncHandler(getAssessmentById))
+assessmentsRouter.get('/:assessmentId/questions', requireAuth, requireRole(['student']), asyncHandler(getAssessmentQuestions))
 assessmentsRouter.post('/:assessmentId/start', requireAuth, requireRole(['student']), asyncHandler(startAssessment))
 assessmentsRouter.post('/:assessmentId/answer', requireAuth, requireRole(['student']), asyncHandler(submitAssessmentAnswer))
 assessmentsRouter.post('/:assessmentId/complete', requireAuth, requireRole(['student']), asyncHandler(completeAssessment))

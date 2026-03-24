@@ -32,14 +32,26 @@ const userSchema = new mongoose.Schema(
       location: { type: String, default: '' },
       education: [
         {
+          id: { type: String, default: () => Date.now().toString() },
           degree: String,
           institution: String,
           year: String,
         },
       ],
-      skills: [String],
+      skills: [
+        {
+          name: String,
+          level: {
+            type: String,
+            enum: ['beginner', 'intermediate', 'advanced', 'expert'],
+            default: 'intermediate'
+          },
+          years: { type: Number, default: 0 },
+        },
+      ],
       projects: [
         {
+          id: { type: String, default: () => Date.now().toString() },
           title: String,
           description: String,
           link: String,
