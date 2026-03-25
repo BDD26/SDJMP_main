@@ -13,6 +13,14 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value === 'true'),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
+  SMTP_USER: z.string().email().optional(),
+  SMTP_PASS: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().optional(),
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
@@ -36,6 +44,11 @@ const env = {
   cookieName: parsedEnv.COOKIE_NAME,
   cookieSecure: parsedEnv.COOKIE_SECURE,
   isProduction: parsedEnv.NODE_ENV === 'production',
+  smtpHost: parsedEnv.SMTP_HOST,
+  smtpPort: parsedEnv.SMTP_PORT,
+  smtpSecure: parsedEnv.SMTP_SECURE,
+  smtpUser: parsedEnv.SMTP_USER,
+  smtpPass: parsedEnv.SMTP_PASS,
   cloudinaryCloudName: parsedEnv.CLOUDINARY_CLOUD_NAME || '',
   cloudinaryApiKey: parsedEnv.CLOUDINARY_API_KEY || '',
   cloudinaryApiSecret: parsedEnv.CLOUDINARY_API_SECRET || '',

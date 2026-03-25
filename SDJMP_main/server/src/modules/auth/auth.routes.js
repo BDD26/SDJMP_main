@@ -11,6 +11,7 @@ import {
   register,
   resetPassword,
   verifySession,
+  verifyEmailConnection,
 } from './auth.controller.js'
 import {
   forgotPasswordSchema,
@@ -29,5 +30,6 @@ authRouter.post('/reset-password', validate(resetPasswordSchema), asyncHandler(r
 authRouter.post('/refresh', requireAuth, asyncHandler(refreshSession))
 authRouter.get('/verify', requireAuth, asyncHandler(verifySession))
 authRouter.get('/session', requireAuth, asyncHandler(getSession))
+authRouter.get('/verify-email', asyncHandler(verifyEmailConnection))
 
 export default authRouter
