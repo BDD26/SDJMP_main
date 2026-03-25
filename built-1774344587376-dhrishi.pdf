@@ -1,0 +1,57 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [6 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+5 0 obj
+<< /Length 2259 >>
+stream
+BT /F2 24 Tf 0.06 0.09 0.16 rg 1 0 0 1 48.00 781.89 Tm (Dhrishi) Tj ET
+BT /F1 11 Tf 0.33 0.39 0.48 rg 1 0 0 1 48.00 751.89 Tm (dhrishipatel07@gmail.com | 9876543210 | Bangalore, India) Tj ET
+BT /F2 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 724.89 Tm (PROFESSIONAL SUMMARY) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 48.00 703.89 Tm (Highly motivated Full Stack Developer with 4+ years of experience building scalable web) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 48.00 686.89 Tm (applications. Expertise in React, Node.js, and Cloud Architecture. Passionate about) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 48.00 669.89 Tm (solving complex problems through clean, efficient code and user-centric design.) Tj ET
+BT /F2 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 644.89 Tm (SKILLS) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 48.00 623.89 Tm (React | Next.js | TypeScript | Node.js | PostgreSQL | AWS | Docker) Tj ET
+BT /F2 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 598.89 Tm (EXPERIENCE) Tj ET
+BT /F2 12 Tf 0.06 0.09 0.16 rg 1 0 0 1 48.00 577.89 Tm (Senior Frontend Engineer) Tj ET
+BT /F1 10 Tf 0.33 0.39 0.48 rg 1 0 0 1 48.00 559.89 Tm (2022 - Present) Tj ET
+BT /F1 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 543.89 Tm (TechFlow Solutions) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 62.00 526.89 Tm (- Led the modernization of internal dashboard, increasing user efficiency by 40%.) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 62.00 509.89 Tm (- Implemented comprehensive testing strategy using Jest and Cypress.) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 62.00 492.89 Tm (- Mentored 5+ junior developers on best practices and design patterns.) Tj ET
+BT /F2 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 469.89 Tm (EDUCATION) Tj ET
+BT /F2 12 Tf 0.06 0.09 0.16 rg 1 0 0 1 48.00 448.89 Tm (B.Tech Computer Science) Tj ET
+BT /F1 11 Tf 0.33 0.39 0.48 rg 1 0 0 1 48.00 430.89 Tm (State Technical University | 2025) Tj ET
+BT /F2 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 407.89 Tm (PROJECTS) Tj ET
+BT /F2 12 Tf 0.06 0.09 0.16 rg 1 0 0 1 48.00 386.89 Tm (SkillMatch Portal) Tj ET
+BT /F1 11 Tf 0.12 0.16 0.22 rg 1 0 0 1 48.00 368.89 Tm (A job matching platform built with React and Shadcn UI.) Tj ET
+BT /F1 11 Tf 0.11 0.31 0.85 rg 1 0 0 1 48.00 351.89 Tm (https://github.com) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents 5 0 R >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000260 00000 n 
+0000002571 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+2713
+%%EOF

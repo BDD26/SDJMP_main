@@ -210,7 +210,15 @@ export default function JobDetailPage() {
   const matchScore = useMemo(() => calculateMatch(job, user), [job, user])
   const matchBreakdown = useMemo(() => buildMatchBreakdown(job, user, matchScore), [job, user, matchScore])
   const normalizedRequirements = useMemo(
-    () => (job?.requirements || []).map(normalizeRequirement).filter(Boolean),
+    () => {
+      const requirements = Array.isArray(job?.requirements) ? job.requirements : []
+      const skillRequirements = Array.isArray(job?.skillRequirements) ? job.skillRequirements : []
+
+      // Prefer explicit `requirements`, but fallback to `skillRequirements` for real jobs.
+      const source = requirements.length > 0 ? requirements : skillRequirements
+
+      return source.map(normalizeRequirement).filter(Boolean)
+    },
     [job]
   )
   const descriptionParagraphs = useMemo(
@@ -285,19 +293,7 @@ export default function JobDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/20 pb-12">
-      <div className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Button variant="ghost" onClick={() => navigate(-1)} className="gap-2">
-            <ChevronLeft className="h-4 w-4" />
-            Back to Jobs
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Share job">
-            <Share2 className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-muted/20 pb-12"> 
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -375,8 +371,8 @@ export default function JobDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {descriptionParagraphs.length > 0 ? (
-                  descriptionParagraphs.map((paragraph) => (
-                    <p key={paragraph} className="text-sm leading-7 text-muted-foreground">{paragraph}</p>
+                  descriptionParagraphs.map((paragraph, idx) => (
+                    <p key={`para-${idx}`} className="text-sm leading-7 text-muted-foreground">{paragraph}</p>
                   ))
                 ) : (
                   <p className="text-sm text-muted-foreground">No detailed description provided.</p>
@@ -430,8 +426,8 @@ export default function JobDetailPage() {
                       Requirements
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {normalizedRequirements.map((requirement) => (
-                        <Badge key={`${requirement.skill}-${requirement.status}`} variant="outline" className="bg-background/50 py-1.5 px-3">
+                      {normalizedRequirements.map((requirement, idx) => (
+                        <Badge key={`req-${idx}-${requirement.skill}`} variant="outline" className="bg-background/50 py-1.5 px-3">
                           {requirement.skill}
                         </Badge>
                       ))}
@@ -447,21 +443,6 @@ export default function JobDetailPage() {
                   By applying, you agree to share your profile and resume with <b>{job.company}</b>.
                 </p>
               </CardFooter>
-            </Card>
-
-            <Card className="border-l-4 border-l-amber-500 border-none shadow-lg glass">
-              <CardContent className="flex gap-3 p-4">
-                <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" />
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold">Application Tip</p>
-                  <p className="text-xs text-muted-foreground">
-                    Keep your profile skills and primary resume updated before applying so your job match score stays accurate.
-                  </p>
-                  <Button variant="link" size="sm" className="h-auto p-0 text-xs text-amber-600" asChild>
-                    <Link to="/student/resumes">Manage resumes</Link>
-                  </Button>
-                </div>
-              </CardContent>
             </Card>
           </div>
         </div>

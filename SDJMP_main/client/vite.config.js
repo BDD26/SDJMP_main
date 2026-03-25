@@ -18,11 +18,6 @@ export default defineConfig({
     allowedHosts: true,
     port: 3000,
     open: false,
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 3000,
-    },
   },
   build: {
     outDir: 'dist',
