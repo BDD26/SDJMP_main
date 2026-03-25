@@ -3,7 +3,9 @@ import Resume from './resume.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { comparePassword, hashPassword, sanitizeUser } from '../auth/auth.service.js'
 import { destroyCloudinaryRawAsset } from '../../utils/cloudinary.js'
-import { uploadResumeLocally, deleteLocalResumeFile } from '../../utils/local-upload.js'
+import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
+import { mergeSkillsIntoUserProfile } from '../skills/skill-inventory.service.js'
+import { createUserNotification } from '../notifications/notification-dispatch.service.js'
 
 function normalizeString(value) {
   return typeof value === 'string' ? value.trim() : ''
@@ -28,6 +30,7 @@ function normalizeProfile(profile = {}) {
             name: normalizeString(skill?.name),
             level: skill?.level || 'intermediate',
             years: Number.isFinite(Number(skill?.years)) ? Number(skill.years) : 0,
+            verified: Boolean(skill?.verified),
           }))
           .filter((skill) => skill.name)
       : [],
@@ -76,6 +79,7 @@ export async function getProfile(req, res) {
 
 export async function updateProfile(req, res) {
   const { body } = req.validated
+  let shouldRefreshMatches = false
 
   if (body.name !== undefined) {
     req.user.name = body.name
@@ -89,10 +93,27 @@ export async function updateProfile(req, res) {
     const existingProfile = normalizeProfile(req.user.profile || {})
     const incomingProfile = body.profile
 
+    let nextSkills = existingProfile.skills
+    if (incomingProfile.skills !== undefined) {
+      const incomingSkills = normalizeProfile({ skills: incomingProfile.skills }).skills
+      const existingVerifiedMap = new Map(
+        existingProfile.skills.map((skill) => [String(skill.name || '').toLowerCase(), Boolean(skill.verified)])
+      )
+
+      nextSkills = incomingSkills.map((skill) => ({
+        ...skill,
+        verified:
+          skill.verified !== undefined
+            ? Boolean(skill.verified)
+            : Boolean(existingVerifiedMap.get(String(skill.name || '').toLowerCase())),
+      }))
+      shouldRefreshMatches = req.user.role === 'student'
+    }
+
     req.user.profile = {
       bio: incomingProfile.bio !== undefined ? normalizeString(incomingProfile.bio) : existingProfile.bio,
       location: incomingProfile.location !== undefined ? normalizeString(incomingProfile.location) : existingProfile.location,
-      skills: incomingProfile.skills !== undefined ? normalizeProfile({ skills: incomingProfile.skills }).skills : existingProfile.skills,
+      skills: nextSkills,
       education: incomingProfile.education !== undefined ? normalizeProfile({ education: incomingProfile.education }).education : existingProfile.education,
       projects: incomingProfile.projects !== undefined ? normalizeProfile({ projects: incomingProfile.projects }).projects : existingProfile.projects,
       certifications: incomingProfile.certifications !== undefined ? normalizeProfile({ certifications: incomingProfile.certifications }).certifications : existingProfile.certifications,
@@ -120,6 +141,10 @@ export async function updateProfile(req, res) {
   }
 
   await req.user.save()
+
+  if (shouldRefreshMatches) {
+    await notifyStudentForAllPublishedJobs(req.user._id)
+  }
 
   res.status(200).json({
     user: sanitizeUser(req.user),
@@ -186,14 +211,51 @@ export async function createResume(req, res) {
     atsScore: type === 'built' ? 85 : 0
   })
 
-  // Trigger skill extraction if it's an uploaded PDF
-  // We await this so the frontend can immediately fetch the updated user profile
+  // Uploaded resume: extract skills from document text.
+  // We await this so the frontend can immediately fetch the updated profile skills.
   if (type === 'uploaded' && fileUrl) {
     try {
       const { processResumeForUser } = await import('./resume.service.js')
       await processResumeForUser(req.user._id, fileUrl, data?.mimeType || 'application/pdf')
     } catch (err) {
       console.error('Failed to load resume service or parse document', err)
+    }
+  }
+
+  // Built resume: use the provided builder skills directly.
+  if (type === 'built' && Array.isArray(data?.skills) && data.skills.length > 0) {
+    try {
+      const user = await User.findById(req.user._id)
+      if (user) {
+        const extractedSkills = data.skills
+          .map((skill) => String(skill || '').trim())
+          .filter(Boolean)
+          .map((name) => ({ name, level: 'intermediate', years: 0, verified: false }))
+
+        const { addedSkills } = await mergeSkillsIntoUserProfile(user, extractedSkills, {
+          verified: false,
+          category: 'resume-builder',
+        })
+
+        if (addedSkills.length > 0) {
+          await createUserNotification({
+            userId: user._id,
+            type: 'assessment',
+            title: 'Skills Added From Resume Builder',
+            message: `We added ${addedSkills.length} skill(s) from your built resume. Take assessments to verify them.`,
+            dedupeKey: `resume-builder-skills:${user._id}:${newResume._id}`,
+            metadata: {
+              source: 'resume-builder',
+              resumeId: String(newResume._id),
+              skills: addedSkills.map((skill) => skill.name),
+            },
+          })
+
+          await notifyStudentForAllPublishedJobs(user._id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to process built resume skills', error)
     }
   }
 

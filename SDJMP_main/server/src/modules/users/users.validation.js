@@ -18,7 +18,8 @@ export const updateProfileSchema = z.object({
       skills: z.array(z.object({
         name: z.string().trim().min(1),
         level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).optional(),
-        years: z.number().min(0).optional()
+        years: z.number().min(0).optional(),
+        verified: z.boolean().optional(),
       })).optional(),
       projects: z.array(z.object({
         id: z.union([z.string(), z.number()]).optional(),

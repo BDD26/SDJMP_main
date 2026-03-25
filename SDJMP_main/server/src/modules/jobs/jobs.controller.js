@@ -2,6 +2,7 @@ import Job from './job.model.js'
 import Application from '../applications/application.model.js'
 import { serializeJob } from './jobs.service.js'
 import { createHttpError } from '../../utils/http-error.js'
+import { computeStudentMatches, notifyStudentsForJob } from './job-match.pipeline.js'
 
 function buildPublicJobFilter(query = {}) {
   const filter = {
@@ -68,6 +69,10 @@ export async function createJob(req, res) {
     deadline: body.deadline ? new Date(body.deadline) : null,
     employerId: req.user._id,
   })
+
+  if (job.status === 'published') {
+    await notifyStudentsForJob(job.toObject ? job.toObject() : job)
+  }
 
   res.status(201).json(serializeJob(job))
 }
@@ -160,63 +165,12 @@ export async function deleteJob(req, res) {
   })
 }
 
-import { calculateMatchScore } from './matching.service.js'
-
 export async function getStudentMatches(req, res) {
   const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 }).lean()
-  
-  const userProfile = req.user.profile || {}
-  const userSkills = userProfile.skills || []
-
-  const preferredLocations = (userProfile.preferences?.locations || []).map(l => {
-    if (typeof l === 'string') return l.toLowerCase()
-    return ''
-  }).filter(Boolean)
-  
-  const preferredJobTypes = (userProfile.preferences?.jobTypes || []).map(t => {
-     if (typeof t === 'string') return t.toLowerCase()
-     return ''
-  }).filter(Boolean)
-
-  const matches = jobs.map(job => {
-    // Both skills array and skillRequirements are considered
-    const combinedJobReqs = [
-      ...(job.skills || []).map(s => ({ name: s, weight: 10 })),
-      ...(job.skillRequirements || [])
-    ]
-
-    const skillMatchScore = calculateMatchScore(userSkills, combinedJobReqs)
-
-    // Calculate composite score (70% Skills, 15% Location, 15% Job Type)
-    let matchScore = skillMatchScore * 0.7
-
-    if (preferredLocations.length > 0 && job.location) {
-      const jobLoc = job.location.toLowerCase()
-      const locMatch = preferredLocations.some(l => jobLoc.includes(l) || (l.includes('remote') && jobLoc.includes('remote')))
-      if (locMatch) matchScore += 15
-    } else if (preferredLocations.length === 0) {
-      // If user has no preference, don't penalize entirely
-      matchScore += 10
-    }
-
-    if (preferredJobTypes.length > 0 && job.type) {
-      const typeMatch = preferredJobTypes.includes(job.type.toLowerCase())
-      if (typeMatch) matchScore += 15
-    } else if (preferredJobTypes.length === 0) {
-      // If user has no preference, don't penalize entirely 
-      matchScore += 10
-    }
-
-    matchScore = Math.min(100, Math.round(matchScore))
-
-    return {
-      ...serializeJob(job),
-      matchScore,
-    }
-  })
-
-  // Sort all jobs by match score, best matches first
-  matches.sort((a, b) => b.matchScore - a.matchScore)
+  const matches = computeStudentMatches(req.user, jobs).map(({ job, matchScore }) => ({
+    ...serializeJob(job),
+    matchScore,
+  }))
 
   res.status(200).json(matches)
 }

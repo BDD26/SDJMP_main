@@ -1,21 +1,64 @@
 import Job from '../jobs/job.model.js'
 import Application from '../applications/application.model.js'
 import { createHttpError } from '../../utils/http-error.js'
+import { calculateMatchScore } from '../jobs/matching.service.js'
+
+function buildStudentMatchList(user, jobs = []) {
+  const userProfile = user?.profile || {}
+  const userSkills = Array.isArray(userProfile.skills) ? userProfile.skills : []
+  const preferredLocations = (userProfile.preferences?.locations || [])
+    .map((location) => (typeof location === 'string' ? location.toLowerCase() : ''))
+    .filter(Boolean)
+  const preferredJobTypes = (userProfile.preferences?.jobTypes || [])
+    .map((type) => (typeof type === 'string' ? type.toLowerCase() : ''))
+    .filter(Boolean)
+
+  return jobs
+    .map((job) => {
+      const combinedJobRequirements = [
+        ...(job.skills || []).map((skill) => ({ name: skill, weight: 10 })),
+        ...(job.skillRequirements || []),
+      ]
+
+      const skillMatchScore = calculateMatchScore(userSkills, combinedJobRequirements)
+      let matchScore = skillMatchScore * 0.7
+
+      if (preferredLocations.length > 0 && job.location) {
+        const jobLocation = job.location.toLowerCase()
+        const locationMatch = preferredLocations.some(
+          (location) => jobLocation.includes(location) || (location.includes('remote') && jobLocation.includes('remote'))
+        )
+
+        if (locationMatch) {
+          matchScore += 15
+        }
+      } else if (preferredLocations.length === 0) {
+        matchScore += 10
+      }
+
+      if (preferredJobTypes.length > 0 && job.type) {
+        if (preferredJobTypes.includes(job.type.toLowerCase())) {
+          matchScore += 15
+        }
+      } else if (preferredJobTypes.length === 0) {
+        matchScore += 10
+      }
+
+      return {
+        ...job,
+        matchScore: Math.min(100, Math.round(matchScore)),
+      }
+    })
+    .sort((a, b) => b.matchScore - a.matchScore)
+}
 
 export async function getDashboardStats(req, res) {
   if (req.user.role !== 'student') {
     throw createHttpError(403, 'Only students can access dashboard stats')
   }
 
-  // Get job matches
-  const matchesResponse = await fetch(`${req.protocol}://${req.get('host')}/api/jobs/student/matches`, {
-    headers: {
-      'Authorization': req.headers.authorization,
-      'Content-Type': 'application/json'
-    }
-  })
-  const matches = matchesResponse.ok ? await matchesResponse.json() : []
-  
+  const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 }).lean()
+  const matches = buildStudentMatchList(req.user, jobs)
   // Get applications
   const applications = await Application.find({ studentId: req.user._id })
   
@@ -76,9 +119,8 @@ export async function getChartData(req, res) {
   }).sort({ createdAt: 1 })
   
   // Get all jobs to calculate matches
-  const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 })
-  const userProfile = req.user.profile || {}
-  const userSkills = (userProfile.skills || []).map(s => typeof s === 'string' ? s.toLowerCase() : s.name?.toLowerCase()).filter(Boolean)
+  const jobs = await Job.find({ status: 'published' }).sort({ createdAt: -1 }).lean()
+  const matches = buildStudentMatchList(req.user, jobs)
   
   for (let i = 5; i >= 0; i--) {
     const monthIndex = (currentMonth - i + 12) % 12
@@ -93,19 +135,9 @@ export async function getChartData(req, res) {
     })
     
     // Count jobs posted this month that match user skills
-    const monthMatches = jobs.filter(job => {
+    const monthMatches = matches.filter((job) => {
       const jobDate = new Date(job.createdAt)
-      const isInMonth = jobDate >= monthStart && jobDate <= monthEnd
-      if (!isInMonth) return false
-      
-      // Calculate match score based on skills
-      const jobSkills = (job.skills || []).map(s => s.toLowerCase())
-      if (jobSkills.length === 0 || userSkills.length === 0) return false
-      
-      const overlap = jobSkills.filter(js => userSkills.includes(js)).length
-      const matchScore = overlap > 0 ? Math.round((overlap / jobSkills.length) * 100) : 0
-      
-      return matchScore >= 50 // Only count as match if 50%+ skill match
+      return jobDate >= monthStart && jobDate <= monthEnd && job.matchScore >= 50
     }).length
     
     chartData.push({
