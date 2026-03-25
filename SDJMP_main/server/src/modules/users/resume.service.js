@@ -77,6 +77,7 @@ export async function identifySkillsFromText(text) {
 
   const foundSkillNames = new Set()
 
+  debugger;
   for (const skillNameLower of allKnownSkillNames) {
     const escapedSkillName = skillNameLower.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
     const regex = new RegExp(`\\b${escapedSkillName}\\b`, 'i')
