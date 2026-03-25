@@ -25,8 +25,8 @@ export async function comparePassword(password, hashedPassword) {
   return bcrypt.compare(password, hashedPassword)
 }
 
-export function createSessionToken(userId) {
-  return jwt.sign({ sub: String(userId) }, env.jwtSecret, {
+export function createSessionToken(userId, role) {
+  return jwt.sign({ sub: String(userId), role }, env.jwtSecret, {
     expiresIn: env.jwtExpiresIn,
   })
 }
@@ -46,4 +46,12 @@ export function sessionCookieOptions() {
 
 export function createPasswordResetToken() {
   return crypto.randomBytes(24).toString('hex')
+}
+
+export async function hashPasswordResetToken(token) {
+  return bcrypt.hash(token, 12)
+}
+
+export async function comparePasswordResetToken(token, hashedToken) {
+  return bcrypt.compare(token, hashedToken)
 }

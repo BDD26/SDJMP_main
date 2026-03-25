@@ -2,12 +2,15 @@ import User from '../users/user.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import {
   comparePassword,
+  comparePasswordResetToken,
   createPasswordResetToken,
   createSessionToken,
   hashPassword,
+  hashPasswordResetToken,
   sanitizeUser,
   sessionCookieOptions,
 } from './auth.service.js'
+import emailService from '../../services/email.service.js'
 import env from '../../config/env.js'
 
 export async function register(req, res) {
@@ -27,7 +30,7 @@ export async function register(req, res) {
     role,
   })
 
-  const token = createSessionToken(user._id)
+  const token = createSessionToken(user._id, user.role)
   res.cookie(env.cookieName, token, sessionCookieOptions())
 
   res.status(201).json({
@@ -48,7 +51,7 @@ export async function login(req, res) {
     throw createHttpError(401, 'Invalid email or password')
   }
 
-  const token = createSessionToken(user._id)
+  const token = createSessionToken(user._id, user.role)
   res.cookie(env.cookieName, token, sessionCookieOptions())
 
   res.status(200).json({
@@ -81,7 +84,7 @@ export async function verifySession(req, res) {
 }
 
 export async function refreshSession(req, res) {
-  const token = createSessionToken(req.user._id)
+  const token = createSessionToken(req.user._id, req.user.role)
   res.cookie(env.cookieName, token, sessionCookieOptions())
 
   res.status(200).json({
@@ -95,39 +98,88 @@ export async function forgotPassword(req, res) {
 
   if (!user) {
     res.status(200).json({
-      message: 'If an account exists for this email, a reset link has been generated.',
+      message: 'If an account exists for this email, a reset link has been sent.',
     })
     return
   }
 
   const resetToken = createPasswordResetToken()
-  user.passwordResetToken = resetToken
+  const hashedResetToken = await hashPasswordResetToken(resetToken)
+  
+  user.passwordResetToken = hashedResetToken
   user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000)
   await user.save()
 
-  res.status(200).json({
-    message: 'Password reset token generated.',
-    ...(env.nodeEnv !== 'production' ? { resetToken } : {}),
-  })
+  try {
+    await emailService.sendPasswordResetEmail(email, resetToken, user.name)
+    
+    res.status(200).json({
+      message: 'Password reset link sent to your email.',
+      ...(env.nodeEnv !== 'production' ? { resetToken } : {}),
+    })
+  } catch (emailError) {
+    console.error('Failed to send password reset email:', emailError)
+    
+    user.passwordResetToken = null
+    user.passwordResetExpiresAt = null
+    await user.save()
+    
+    throw createHttpError(500, 'Failed to send password reset email')
+  }
 }
 
 export async function resetPassword(req, res) {
   const { token, newPassword } = req.validated.body
-  const user = await User.findOne({
-    passwordResetToken: token,
+  
+  const users = await User.find({
     passwordResetExpiresAt: { $gt: new Date() },
   }).select('+passwordResetToken +passwordResetExpiresAt')
 
-  if (!user) {
+  let validUser = null
+  for (const user of users) {
+    if (await comparePasswordResetToken(token, user.passwordResetToken)) {
+      validUser = user
+      break
+    }
+  }
+
+  if (!validUser) {
     throw createHttpError(400, 'Reset token is invalid or expired')
   }
 
-  user.password = await hashPassword(newPassword)
-  user.passwordResetToken = null
-  user.passwordResetExpiresAt = null
-  await user.save()
+  validUser.password = await hashPassword(newPassword)
+  validUser.passwordResetToken = null
+  validUser.passwordResetExpiresAt = null
+  await validUser.save()
 
   res.status(200).json({
     message: 'Password reset successfully',
   })
+}
+
+export async function verifyEmailConnection(req, res) {
+  try {
+    const result = await emailService.verifyConnection()
+    
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message,
+        configured: true
+      })
+    } else {
+      res.status(400).json({
+        success: false,
+        message: result.message,
+        configured: false,
+        hint: 'Please configure SMTP settings in your .env file'
+      })
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Email service verification failed',
+      error: error.message
+    })
+  }
 }
