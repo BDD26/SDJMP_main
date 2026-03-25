@@ -10,6 +10,7 @@ export function serializeNotification(notificationDocument) {
     type: notification.type || 'system',
     read: Boolean(notification.read),
     timestamp: notification.createdAt || new Date().toISOString(),
+    metadata: notification.metadata || {},
     createdAt: notification.createdAt,
     updatedAt: notification.updatedAt,
   }

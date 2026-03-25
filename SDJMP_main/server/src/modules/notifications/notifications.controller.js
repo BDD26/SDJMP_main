@@ -10,7 +10,8 @@ export async function getNotifications(req, res) {
     message: n.message,
     type: n.type,
     timestamp: n.createdAt,
-    read: n.read
+    read: n.read,
+    metadata: n.metadata || {},
   }))
 
   res.status(200).json(formatted)

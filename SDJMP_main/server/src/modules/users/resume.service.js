@@ -1,7 +1,9 @@
-import pdf from 'pdf-parse/lib/pdf-parse.js'
-import fetch from 'node-fetch'
-import Skill from '../skills/skill.model.js'
+import pdf from 'pdf-parse'
 import User from '../users/user.model.js'
+import Job from '../jobs/job.model.js'
+import { createUserNotification } from '../notifications/notification-dispatch.service.js'
+import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
+import { mergeSkillsIntoUserProfile } from '../skills/skill-inventory.service.js'
 
 /**
  * Downloads the PDF buffer from a given URL
@@ -32,7 +34,7 @@ export async function extractTextFromPdf(buffer) {
 }
 
 /**
- * Analyzes text against our global Skill dictionary to find matches.
+ * Analyzes text against a dynamic dictionary to find skills.
  * Returns an array of skill objects ready to be added to the user's profile.
  */
 const FALLBACK_SKILLS = [
@@ -51,14 +53,28 @@ export async function identifySkillsFromText(text) {
   if (!text) return []
 
   const normalizedText = text.toLowerCase().replace(/[^a-z0-9+#.\- ]/g, ' ')
-  
-  // Get all globally known skills from the DB
-  const dbSkills = await Skill.find({}).lean()
-  const dbSkillNamesLower = new Set(dbSkills.map(s => s.name.toLowerCase()))
-  
-  // Merge DB skills with fallback dictionary
-  const allKnownSkillNames = new Set([...dbSkillNamesLower, ...FALLBACK_SKILLS.map(s => s.toLowerCase())])
-  
+
+  const activeJobs = await Job.find({ status: 'published' }).select('skills skillRequirements').lean()
+  const jobSkillNames = new Set()
+  for (const job of activeJobs) {
+    for (const skill of job.skills || []) {
+      if (typeof skill === 'string' && skill.trim()) {
+        jobSkillNames.add(skill.trim())
+      }
+    }
+    for (const requirement of job.skillRequirements || []) {
+      const requirementName = String(requirement?.name || '').trim()
+      if (requirementName) {
+        jobSkillNames.add(requirementName)
+      }
+    }
+  }
+
+  const allKnownSkillNames = new Set([
+    ...FALLBACK_SKILLS.map((skill) => skill.toLowerCase()),
+    ...Array.from(jobSkillNames).map((skill) => skill.toLowerCase()),
+  ])
+
   const foundSkillNames = new Set()
 
   for (const skillNameLower of allKnownSkillNames) {
@@ -70,40 +86,21 @@ export async function identifySkillsFromText(text) {
     }
   }
 
-  // Formatting found skills back to Original case via a map
   const caseMap = new Map()
-  dbSkills.forEach(s => caseMap.set(s.name.toLowerCase(), s.name))
-  FALLBACK_SKILLS.forEach(s => caseMap.set(s.toLowerCase(), s))
+  FALLBACK_SKILLS.forEach((skill) => caseMap.set(skill.toLowerCase(), skill))
+  Array.from(jobSkillNames).forEach((skill) => caseMap.set(skill.toLowerCase(), skill))
 
   const formattedFoundSkills = []
-  
+
   for (const lowerCaseSkill of foundSkillNames) {
     const originalCase = caseMap.get(lowerCaseSkill)
+    if (!originalCase) continue
+
     formattedFoundSkills.push({
       name: originalCase,
       level: 'intermediate',
       years: 0
     })
-
-    // If this skill wasn't in the global DB, add it to the skill inventory
-    if (!dbSkillNamesLower.has(lowerCaseSkill)) {
-      try {
-        await Skill.create({
-          name: originalCase,
-          category: 'extracted',
-          popularity: 1
-        })
-        dbSkillNamesLower.add(lowerCaseSkill) // Add to prevent duplicate creations in this loop
-      } catch (err) {
-        // Ignore duplicate key errors if another async process already inserted it
-      }
-    } else {
-      // If it exists in DB, bump its popularity
-      await Skill.updateOne(
-        { name: new RegExp(`^${originalCase}$`, 'i') },
-        { $inc: { popularity: 1 } }
-      ).catch(() => {})
-    }
   }
 
   return formattedFoundSkills
@@ -129,38 +126,32 @@ export async function processResumeForUser(userId, fileUrl, fileType) {
     const user = await User.findById(userId)
     if (!user) return
 
-    // Ensure user.profile and skills array exist
-    if (!user.profile) user.profile = {}
-    if (!user.profile.skills) user.profile.skills = []
+    const { addedSkills } = await mergeSkillsIntoUserProfile(user, matchedSkills, {
+      category: 'extracted',
+      verified: false,
+    })
 
-    const currentSkillNames = user.profile.skills.map(s => s.name.toLowerCase())
-    let addedNew = false
+    if (addedSkills.length > 0) {
+      console.log(`[Resume Parser] Added ${addedSkills.length} skills to user ${userId}`)
 
-    // Add newly found skills to user profile
-    for (const newSkill of matchedSkills) {
-      if (!currentSkillNames.includes(newSkill.name.toLowerCase())) {
-        user.profile.skills.push(newSkill)
-        addedNew = true
-      }
-    }
+      const skillNames = addedSkills.map((skill) => skill.name).join(', ')
 
-    if (addedNew) {
-      // Mark as changed so mongoose saves the mixed subdocument cleanly
-      user.markModified('profile.skills')
-      await user.save()
-      console.log(`[Resume Parser] Added ${matchedSkills.length} skills to user ${userId}`)
-
-      // Generate a comma separated string of new skills
-      const skillNames = matchedSkills.map(s => s.name).join(', ')
-      
-      // Dispatch a notification to the user to take an assessment
-      const Notification = (await import('../notifications/notification.model.js')).default;
-      await Notification.create({
+      await createUserNotification({
         userId: user._id,
         type: 'assessment',
-        title: 'Verify Your New Skills!',
-        message: `We found new skills in your resume (${skillNames}). Take an assessment test to earn a verified badge and boost your job match score!`
+        title: 'Verify Your New Skills',
+        message: `We found new skills in your resume (${skillNames}). Take an assessment to earn verified badges and improve matching.`,
+        dedupeKey: `resume-skill-discovery:${user._id}:${addedSkills
+          .map((skill) => skill.name.toLowerCase())
+          .sort()
+          .join('|')}`,
+        metadata: {
+          source: 'resume',
+          skills: addedSkills.map((skill) => skill.name),
+        },
       })
+
+      await notifyStudentForAllPublishedJobs(user._id)
     }
 
   } catch (error) {

@@ -2,6 +2,120 @@ import { normalizeSessionUser } from '@/features/auth/schemas'
 import { normalizeNotifications } from '@/features/notifications/schemas'
 import { request } from '@/shared/api/http'
 
+function unwrapPayload(payload, key) {
+  if (key && Array.isArray(payload?.[key])) {
+    return payload[key]
+  }
+
+  if (key && payload?.[key] && typeof payload[key] === 'object') {
+    return payload[key]
+  }
+
+  if (payload?.data?.[key] !== undefined) {
+    return payload.data[key]
+  }
+
+  return payload
+}
+
+function normalizeSkillName(skill) {
+  if (typeof skill === 'string') {
+    return skill.trim()
+  }
+
+  if (skill && typeof skill === 'object') {
+    return String(skill.name || skill.label || '').trim()
+  }
+
+  return ''
+}
+
+function normalizeJob(job) {
+  if (!job) {
+    return null
+  }
+
+  const sourceJob = job.job && typeof job.job === 'object' ? job.job : job
+  const rawSalary = sourceJob.salary ?? job.salary ?? ''
+  const salary =
+    rawSalary && typeof rawSalary === 'object'
+      ? {
+          min: Number(rawSalary.min) || 0,
+          max: Number(rawSalary.max) || 0,
+          currency: rawSalary.currency || '',
+          label: rawSalary.label || (
+            [rawSalary.min, rawSalary.max].some((value) => Number(value) > 0)
+              ? [
+                  rawSalary.min ? `$${Number(rawSalary.min).toLocaleString()}` : '',
+                  rawSalary.max ? `$${Number(rawSalary.max).toLocaleString()}` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' - ')
+              : ''
+          ),
+        }
+      : rawSalary
+
+  const skills = [...(sourceJob.skills || []), ...(sourceJob.skillRequirements || [])]
+    .map(normalizeSkillName)
+    .filter(Boolean)
+  const uniqueSkills = [...new Set(skills)]
+
+  return {
+    ...job,
+    ...sourceJob,
+    id: String(sourceJob.id || sourceJob._id || job.id || job._id || ''),
+    company: sourceJob.company || sourceJob.companyName || job.company || job.companyName || 'Unknown Company',
+    companyName: sourceJob.companyName || sourceJob.company || job.companyName || job.company || 'Unknown Company',
+    location: sourceJob.location || sourceJob.locationType || job.location || 'Remote',
+    salary,
+    skills: uniqueSkills,
+    matchScore: Number(job.matchScore) || 0,
+  }
+}
+
+function normalizeApplication(application) {
+  if (!application) {
+    return null
+  }
+
+  const job = normalizeJob(application.job || application.jobId || {})
+
+  return {
+    ...application,
+    id: String(application.id || application._id || ''),
+    jobId:
+      typeof application.jobId === 'string'
+        ? application.jobId
+        : String(application.jobId?.id || application.jobId?._id || job?.id || ''),
+    job,
+    position: application.position || job?.title || 'Unknown Role',
+    company: application.company || job?.company || 'Unknown Company',
+    location: application.location || job?.location || 'Remote',
+    appliedDate: application.appliedDate || application.createdAt || null,
+    status: application.status || 'pending',
+  }
+}
+
+function normalizeResume(resume) {
+  if (!resume) {
+    return null
+  }
+
+  return {
+    ...resume,
+    _id: String(resume._id || resume.id || ''),
+    id: String(resume.id || resume._id || ''),
+    name: resume.name || 'Untitled Resume',
+    type: resume.type || 'uploaded',
+    fileUrl: resume.fileUrl || '',
+    filePublicId: resume.filePublicId || '',
+    status: resume.status || 'pending',
+    isPrimary: Boolean(resume.isPrimary),
+    data: resume.data || null,
+  }
+}
+
 function buildQueryString(params = {}) {
   const searchParams = new URLSearchParams()
 
@@ -84,9 +198,27 @@ export const userAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
-  getResumes: () => apiRequest('/users/resumes'),
-  createResume: (data) => apiRequest('/users/resumes', { method: 'post', body: data }),
-  updateResume: (id, data) => apiRequest(`/users/resumes/${id}`, { method: 'put', body: data }),
+  getResumes: async () => {
+    const payload = await apiRequest('/users/resumes')
+    return {
+      ...payload,
+      resumes: (unwrapPayload(payload, 'resumes') || []).map(normalizeResume).filter(Boolean),
+    }
+  },
+  createResume: async (data) => {
+    const payload = await apiRequest('/users/resumes', { method: 'post', body: data })
+    return {
+      ...payload,
+      resume: normalizeResume(unwrapPayload(payload, 'resume')),
+    }
+  },
+  updateResume: async (id, data) => {
+    const payload = await apiRequest(`/users/resumes/${id}`, { method: 'put', body: data })
+    return {
+      ...payload,
+      resume: normalizeResume(unwrapPayload(payload, 'resume')),
+    }
+  },
   deleteResume: (id) => apiRequest(`/users/resumes/${id}`, { method: 'delete' }),
 
   changePassword: (currentPassword, newPassword) =>
@@ -99,19 +231,34 @@ export const userAPI = {
 }
 
 export const jobsAPI = {
-  getAll: (params = {}) => apiRequest(`/jobs${buildQueryString(params)}`),
-  getById: (id) => apiRequest(`/jobs/${id}`),
+  getAll: async (params = {}) => {
+    const payload = await apiRequest(`/jobs${buildQueryString(params)}`)
+    return (Array.isArray(payload) ? payload : []).map(normalizeJob).filter(Boolean)
+  },
+  getById: async (id) => normalizeJob(await apiRequest(`/jobs/${id}`)),
   getMyJobs: () => apiRequest('/jobs/my'),
   create: (jobData) => apiRequest('/jobs', { method: 'post', body: jobData }),
   update: (id, jobData) => apiRequest(`/jobs/${id}`, { method: 'put', body: jobData }),
   delete: (id) => apiRequest(`/jobs/${id}`, { method: 'delete' }),
-  getRecommended: () => apiRequest('/jobs/recommended'),
-  getStudentMatches: () => apiRequest('/jobs/student/matches'),
-  search: (query) => apiRequest(`/jobs/search${buildQueryString({ q: query })}`),
+  getRecommended: async () => {
+    const payload = await apiRequest('/jobs/recommended')
+    return (Array.isArray(payload) ? payload : []).map(normalizeJob).filter(Boolean)
+  },
+  getStudentMatches: async () => {
+    const payload = await apiRequest('/jobs/student/matches')
+    return (Array.isArray(payload) ? payload : []).map(normalizeJob).filter(Boolean)
+  },
+  search: async (query) => {
+    const payload = await apiRequest(`/jobs/search${buildQueryString({ q: query })}`)
+    return (Array.isArray(payload) ? payload : []).map(normalizeJob).filter(Boolean)
+  },
 }
 
 export const applicationsAPI = {
-  getMyApplications: () => apiRequest('/applications/my'),
+  getMyApplications: async () => {
+    const payload = await apiRequest('/applications/my')
+    return (Array.isArray(payload) ? payload : []).map(normalizeApplication).filter(Boolean)
+  },
   getForJob: (jobId) => apiRequest(`/applications/job/${jobId}`),
   apply: (jobId, applicationData) =>
     apiRequest('/applications', {

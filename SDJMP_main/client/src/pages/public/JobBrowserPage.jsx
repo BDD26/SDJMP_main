@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Search,
@@ -25,6 +25,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import api from '@/services/api'
+import { toast } from 'sonner'
 
 const mockJobs = [
   {
@@ -105,14 +107,78 @@ const jobTypes = ['Full-time', 'Part-time', 'Internship', 'Contract', 'Remote']
 const experienceLevels = ['Entry Level', 'Mid Level', 'Senior Level', 'Lead/Manager']
 const locations = ['Remote', 'San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'Los Angeles, CA']
 
+function formatSalary(salary) {
+  if (!salary) {
+    return 'Not specified'
+  }
+
+  if (typeof salary === 'string') {
+    return salary
+  }
+
+  if (salary.label) {
+    return salary.label
+  }
+
+  if (salary.min || salary.max) {
+    const min = salary.min ? `$${Number(salary.min).toLocaleString()}` : ''
+    const max = salary.max ? `$${Number(salary.max).toLocaleString()}` : ''
+    return [min, max].filter(Boolean).join(' - ')
+  }
+
+  return 'Not specified'
+}
+
 export default function JobBrowserPage() {
+  const [jobs, setJobs] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [locationFilter, setLocationFilter] = useState('all')
   const [selectedTypes, setSelectedTypes] = useState([])
   const [selectedExperience, setSelectedExperience] = useState([])
   const [showFilters, setShowFilters] = useState(false)
 
-  const filteredJobs = mockJobs.filter((job) => {
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadJobs() {
+      try {
+        setIsLoading(true)
+        const liveJobs = await api.jobs.getAll()
+
+        if (!isMounted) {
+          return
+        }
+
+        setJobs(liveJobs.length > 0 ? liveJobs : mockJobs)
+      } catch (error) {
+        if (isMounted) {
+          setJobs(mockJobs)
+        }
+        toast.error('Unable to load live jobs, showing demo listings instead')
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    loadJobs()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const availableLocations = useMemo(() => {
+    const dynamicLocations = jobs
+      .map((job) => job.location)
+      .filter(Boolean)
+
+    return ['Remote', ...new Set([...locations, ...dynamicLocations])]
+  }, [jobs])
+
+  const filteredJobs = jobs.filter((job) => {
     const matchesSearch = 
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -169,7 +235,7 @@ export default function JobBrowserPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Locations</SelectItem>
-                    {locations.map((loc) => (
+                    {availableLocations.map((loc) => (
                       <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                     ))}
                   </SelectContent>
@@ -328,6 +394,7 @@ export default function JobBrowserPage() {
             <div className="flex items-center justify-between mb-6">
               <p className="text-muted-foreground">
                 <span className="font-medium text-foreground">{filteredJobs.length}</span> jobs found
+                {isLoading ? ' • Loading live jobs...' : ''}
               </p>
               <Select defaultValue="recent">
                 <SelectTrigger className="w-[180px]">
@@ -380,7 +447,7 @@ export default function JobBrowserPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4" />
-                            {job.salary}
+                            {formatSalary(job.salary)}
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />

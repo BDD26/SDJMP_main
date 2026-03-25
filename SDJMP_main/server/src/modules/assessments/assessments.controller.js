@@ -1,6 +1,24 @@
 import Assessment from './assessment.model.js'
 import StudentAssessment from './studentAssessment.model.js'
 import { createHttpError } from '../../utils/http-error.js'
+import User from '../users/user.model.js'
+import { mergeSkillsIntoUserProfile } from '../skills/skill-inventory.service.js'
+import { createUserNotification } from '../notifications/notification-dispatch.service.js'
+import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
+
+async function resolveAssessmentSkillName(assessment) {
+  const title = String(assessment?.title || '').trim()
+  const category = String(assessment?.category || '').trim()
+  const candidates = [title, category]
+    .map((value) => value.replace(/\b(assessment|test|quiz|exam|badge|certification)\b/gi, '').trim())
+    .filter(Boolean)
+
+  if (candidates.length === 0) {
+    return title || category || 'General'
+  }
+
+  return candidates[0]
+}
 
 export async function getAllAssessments(req, res) {
   const assessments = await Assessment.find({ status: 'published' }).sort({ createdAt: -1 })
@@ -99,6 +117,46 @@ export async function completeAssessment(req, res) {
   studentAssessment.progress = 100
 
   await studentAssessment.save()
+
+  const assessmentSkillName = await resolveAssessmentSkillName(assessmentData)
+  const user = await User.findById(req.user._id)
+
+  if (user && assessmentSkillName) {
+    const verified = Number(studentAssessment.score || 0) >= 60
+    await mergeSkillsIntoUserProfile(
+      user,
+      [
+        {
+          name: assessmentSkillName,
+          level: verified ? 'advanced' : 'intermediate',
+          years: 0,
+          verified,
+        },
+      ],
+      {
+        category: assessmentData?.category || 'assessment',
+        verified,
+      }
+    )
+
+    await createUserNotification({
+      userId: user._id,
+      type: 'assessment',
+      title: verified ? 'Skill Badge Earned' : 'Assessment Completed',
+      message: verified
+        ? `You earned a verified ${assessmentSkillName} badge with a score of ${studentAssessment.score}%.`
+        : `You completed the ${assessmentData?.title || 'assessment'} with a score of ${studentAssessment.score}%.`,
+      dedupeKey: `assessment-complete:${user._id}:${studentAssessment.assessmentId}:${studentAssessment._id}`,
+      metadata: {
+        assessmentId: String(studentAssessment.assessmentId),
+        skill: assessmentSkillName,
+        score: studentAssessment.score,
+        verified,
+      },
+    })
+
+    await notifyStudentForAllPublishedJobs(user._id)
+  }
 
   res.status(200).json(studentAssessment)
 }

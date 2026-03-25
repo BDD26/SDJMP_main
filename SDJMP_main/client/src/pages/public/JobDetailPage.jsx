@@ -29,6 +29,18 @@ import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/services/api'
 
+function normalizeSkillValue(skill) {
+  if (typeof skill === 'string') {
+    return skill.trim().toLowerCase()
+  }
+
+  if (skill && typeof skill === 'object') {
+    return String(skill.name || skill.label || '').trim().toLowerCase()
+  }
+
+  return ''
+}
+
 function normalizeRequirement(requirement) {
   if (!requirement) {
     return null
@@ -51,11 +63,11 @@ function normalizeRequirement(requirement) {
 
 function calculateMatch(job, user) {
   const studentSkills = (user?.profile?.skills || [])
-    .map((skill) => String(skill).trim().toLowerCase())
+    .map(normalizeSkillValue)
     .filter(Boolean)
 
   const jobSkills = (job?.skills || [])
-    .map((skill) => String(skill).trim().toLowerCase())
+    .map(normalizeSkillValue)
     .filter(Boolean)
 
   if (jobSkills.length === 0) {
@@ -68,11 +80,11 @@ function calculateMatch(job, user) {
 
 function buildMatchBreakdown(job, user, matchScore) {
   const studentSkills = (user?.profile?.skills || [])
-    .map((skill) => String(skill).trim().toLowerCase())
+    .map(normalizeSkillValue)
     .filter(Boolean)
 
   const jobSkills = (job?.skills || [])
-    .map((skill) => String(skill).trim().toLowerCase())
+    .map(normalizeSkillValue)
     .filter(Boolean)
 
   const overlap = jobSkills.filter((skill) => studentSkills.includes(skill)).length
@@ -97,6 +109,28 @@ function buildMatchBreakdown(job, user, matchScore) {
       status: readinessScore >= 75 ? 'Ready to apply' : 'Can improve',
     },
   ]
+}
+
+function formatSalary(salary) {
+  if (!salary) {
+    return 'Not specified'
+  }
+
+  if (typeof salary === 'string') {
+    return salary
+  }
+
+  if (salary.label) {
+    return salary.label
+  }
+
+  if (salary.min || salary.max) {
+    const min = salary.min ? `$${Number(salary.min).toLocaleString()}` : ''
+    const max = salary.max ? `$${Number(salary.max).toLocaleString()}` : ''
+    return [min, max].filter(Boolean).join(' - ')
+  }
+
+  return 'Not specified'
 }
 
 export default function JobDetailPage() {
@@ -303,7 +337,7 @@ export default function JobDetailPage() {
                     <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Salary</p>
                     <p className="flex items-center gap-1 text-sm font-medium">
                       <DollarSign className="h-3 w-3 text-primary" />
-                      {job.salary || 'Not specified'}
+                      {formatSalary(job.salary)}
                     </p>
                   </div>
                   <div className="rounded-xl border bg-background p-3 shadow-sm">

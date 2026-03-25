@@ -1,8 +1,7 @@
 import cron from 'node-cron'
 import Job from './job.model.js'
 import User from '../users/user.model.js'
-import Notification from '../notifications/notification.model.js'
-import { calculateMatchScore } from './matching.service.js'
+import { notifyStudentAboutMatchingJobs } from './job-match.pipeline.js'
 
 /**
  * Runs the matching algorithm for all active students against all published jobs.
@@ -30,34 +29,8 @@ export async function runDailyJobMatching() {
       const userSkills = student.profile?.skills || []
       if (!userSkills.length) continue
 
-      for (const job of activeJobs) {
-        const combinedJobReqs = [
-          ...(job.skills || []).map(s => ({ name: s, weight: 10 })),
-          ...(job.skillRequirements || [])
-        ]
-
-        const matchScore = calculateMatchScore(userSkills, combinedJobReqs)
-
-        if (matchScore >= 50) {
-          // Check if we already notified this user about this job recently
-          const messageSub = `at ${job.companyName}`
-          const recentNotification = await Notification.findOne({
-            userId: student._id,
-            type: 'job',
-            message: { $regex: messageSub, $options: 'i' }
-          })
-          
-          if (!recentNotification) {
-            await Notification.create({
-              userId: student._id,
-              type: 'job',
-              title: 'New Job Match!',
-              message: `We found a ${matchScore}% match for your skills: ${job.title} at ${job.companyName}`,
-            })
-            notificationsCreated++
-          }
-        }
-      }
+      const notifications = await notifyStudentAboutMatchingJobs(student, activeJobs, 50)
+      notificationsCreated += notifications.filter(Boolean).length
     }
 
     console.log(`[Job Matcher] Routine complete. Created ${notificationsCreated} new notifications.`)
