@@ -141,17 +141,19 @@ export async function completeAssessment(req, res) {
 
     await createUserNotification({
       userId: user._id,
-      type: 'assessment',
-      title: verified ? 'Skill Badge Earned' : 'Assessment Completed',
+      type: verified ? 'skill_badge' : 'assessment_complete',
+      title: verified ? 'Skill Badge Earned! 🎖️' : 'Assessment Completed',
       message: verified
-        ? `You earned a verified ${assessmentSkillName} badge with a score of ${studentAssessment.score}%.`
-        : `You completed the ${assessmentData?.title || 'assessment'} with a score of ${studentAssessment.score}%.`,
-      dedupeKey: `assessment-complete:${user._id}:${studentAssessment.assessmentId}:${studentAssessment._id}`,
+        ? `Congratulations! You earned a verified ${assessmentSkillName} badge with a score of ${studentAssessment.score}%. This skill now has a 1.5x boost in job matching!`
+        : `You completed the ${assessmentData?.title || 'assessment'} with a score of ${studentAssessment.score}%. Take a verified assessment to earn badges and improve your job matching.`,
+      dedupeKey: `assessment-complete:${user._id}:${studentAssessment.assessmentId}`,
       metadata: {
         assessmentId: String(studentAssessment.assessmentId),
+        assessmentTitle: String(assessmentData?.title || 'Assessment'),
         skill: assessmentSkillName,
         score: studentAssessment.score,
         verified,
+        category: assessmentData?.category || 'general',
       },
     })
 

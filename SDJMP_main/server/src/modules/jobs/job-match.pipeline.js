@@ -6,7 +6,11 @@ import { createUserNotification } from '../notifications/notification-dispatch.s
 export function buildCombinedJobRequirements(job = {}) {
   return [
     ...((job.skills || []).map((skill) => ({ name: skill, weight: 10 }))),
-    ...(job.skillRequirements || []),
+    ...((job.skillRequirements || []).map((requirement) => ({
+      name: requirement?.name || requirement?.skill || requirement?.label || '',
+      weight: typeof requirement?.weight === 'number' ? requirement.weight : (typeof requirement?.score === 'number' ? requirement.score : 10),
+      level: requirement?.level,
+    })).filter((requirement) => requirement.name)),
   ]
 }
 
@@ -60,58 +64,148 @@ export function computeStudentMatches(student = {}, jobs = []) {
 
 export async function notifyStudentAboutMatchingJobs(student, jobs = [], minimumScore = 50) {
   if (!student?._id) {
+    console.warn('[Job Matcher] Invalid student object provided')
+    return []
+  }
+
+  if (!jobs || jobs.length === 0) {
     return []
   }
 
   const matches = computeStudentMatches(student, jobs).filter((entry) => entry.matchScore >= minimumScore)
-  const createdNotifications = []
-
-  for (const { job, matchScore } of matches) {
-    const notification = await createUserNotification({
-      userId: student._id,
-      type: 'job',
-      title: 'New Recommended Job',
-      message: `${job.title} at ${job.companyName} matches your skills with a ${matchScore}% score.`,
-      dedupeKey: `job-match:${student._id}:${job._id}`,
-      metadata: {
-        jobId: String(job._id),
-        matchScore,
-      },
-    })
-
-    createdNotifications.push(notification)
-  }
-
-  return createdNotifications
-}
-
-export async function notifyStudentsForJob(job, minimumScore = 50) {
-  if (!job?._id || job.status !== 'published') {
+  
+  if (matches.length === 0) {
     return []
   }
 
-  const students = await User.find({ role: 'student' }).lean()
   const createdNotifications = []
 
-  for (const student of students) {
-    const [notification] = await notifyStudentAboutMatchingJobs(student, [job], minimumScore)
-    if (notification) {
-      createdNotifications.push(notification)
+  for (const { job, matchScore } of matches) {
+    try {
+      const notification = await createUserNotification({
+        userId: student._id,
+        type: 'job',
+        title: 'New Recommended Job',
+        message: `${job.title} at ${job.companyName} matches your skills with a ${matchScore}% score.`,
+        dedupeKey: `job-match:${student._id}:${job._id}`,
+        metadata: {
+          jobId: String(job._id),
+          jobTitle: job.title,
+          company: job.companyName,
+          matchScore,
+          location: job.location || 'Not specified',
+          type: job.type || 'Not specified',
+        },
+      })
+
+      if (notification) {
+        createdNotifications.push(notification)
+      }
+    } catch (error) {
+      console.error(
+        `[Job Matcher] Error creating notification for student ${student._id} and job ${job._id}:`,
+        error.message
+      )
+      // Continue with next job if one fails
     }
   }
 
   return createdNotifications
 }
 
-export async function notifyStudentForAllPublishedJobs(studentId, minimumScore = 50) {
-  const [student, jobs] = await Promise.all([
-    User.findById(studentId).lean(),
-    Job.find({ status: 'published' }).lean(),
-  ])
-
-  if (!student || student.role !== 'student') {
+export async function notifyStudentsForJob(job, minimumScore = 50) {
+  if (!job?._id) {
+    console.warn('[Job Matcher] Invalid job object provided')
     return []
   }
 
-  return notifyStudentAboutMatchingJobs(student, jobs, minimumScore)
+  if (job.status !== 'published') {
+    console.info(`[Job Matcher] Job ${job._id} is not published, skipping notifications`)
+    return []
+  }
+
+  let students = []
+  try {
+    students = await User.find({ role: 'student' }).lean()
+  } catch (error) {
+    console.error('[Job Matcher] Error fetching students:', error.message)
+    return []
+  }
+
+  if (!students || students.length === 0) {
+    console.info('[Job Matcher] No students found to notify')
+    return []
+  }
+
+  const createdNotifications = []
+  let processedCount = 0
+  let notificationCount = 0
+
+  for (const student of students) {
+    try {
+      const notifications = await notifyStudentAboutMatchingJobs(student, [job], minimumScore)
+      if (notifications && notifications.length > 0) {
+        createdNotifications.push(...notifications)
+        notificationCount += notifications.length
+      }
+      processedCount++
+    } catch (error) {
+      console.error(
+        `[Job Matcher] Error notifying student ${student._id} about job ${job._id}:`,
+        error.message
+      )
+      // Continue with next student
+    }
+  }
+
+  console.log(
+    `[Job Matcher] Notified ${processedCount}/${students.length} students about job ${job._id}. Created ${notificationCount} notifications.`
+  )
+
+  return createdNotifications
+}
+
+export async function notifyStudentForAllPublishedJobs(studentId, minimumScore = 50) {
+  if (!studentId) {
+    console.warn('[Job Matcher] Invalid studentId provided')
+    return []
+  }
+
+  try {
+    const [student, jobs] = await Promise.all([
+      User.findById(studentId).lean(),
+      Job.find({ status: 'published' }).lean(),
+    ])
+
+    if (!student) {
+      console.warn(`[Job Matcher] Student ${studentId} not found`)
+      return []
+    }
+
+    if (student.role !== 'student') {
+      console.info(`[Job Matcher] User ${studentId} is not a student, skipping job matching`)
+      return []
+    }
+
+    if (!jobs || jobs.length === 0) {
+      console.info(`[Job Matcher] No published jobs found for student ${studentId}`)
+      return []
+    }
+
+    const notifications = await notifyStudentAboutMatchingJobs(student, jobs, minimumScore)
+    
+    if (notifications && notifications.length > 0) {
+      console.log(
+        `[Job Matcher] Created ${notifications.length} new job recommendations for student ${studentId}`
+      )
+    }
+
+    return notifications
+  } catch (error) {
+    console.error(
+      `[Job Matcher] Error notifying student ${studentId} of all published jobs:`,
+      error.message
+    )
+    return []
+  }
 }

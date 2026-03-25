@@ -798,7 +798,7 @@ export default function StudentResumeManager() {
                 ) : resumes.map((resume) => (
                   <div
                     key={resume._id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl border bg-background/50 hover:bg-background transition-all group cursor-pointer"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border bg-background/50 hover:bg-background transition-all group cursor-pointer"
                     onClick={() => handlePreview(resume)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
@@ -809,31 +809,31 @@ export default function StudentResumeManager() {
                     role="button"
                     tabIndex={0}
                   >
-                    <div className="flex items-center gap-4 min-w-0 flex-1">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <div className="h-12 w-12 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                         <FileText className="h-6 w-6" />
                       </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
                           <h4 className="font-bold text-sm truncate">{resume.name}</h4>
-                          <Badge variant={resume.type === 'built' ? 'default' : 'outline'} className="text-[10px] h-5">
+                          <Badge variant={resume.type === 'built' ? 'default' : 'outline'} className="text-[10px] h-5 shrink-0">
                             {resume.type === 'built' ? 'Builder' : resume.type}
                           </Badge>
-                          {resume.isPrimary && <Badge variant="secondary" className="text-[10px]">Primary</Badge>}
+                          {resume.isPrimary && <Badge variant="secondary" className="text-[10px] shrink-0">Primary</Badge>}
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {new Date(resume.createdAt).toLocaleDateString()}</span>
-                          <span className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1 whitespace-nowrap"><Clock className="h-3 w-3 shrink-0" /> {new Date(resume.createdAt).toLocaleDateString()}</span>
+                          <span className="flex items-center gap-1 whitespace-nowrap">
                             {resume.status === 'verified' ? (
-                              <><CheckCircle2 className="h-3 w-3 text-emerald-500" /> ATS Friendly</>
+                              <><CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-500" /> ATS Friendly</>
                             ) : (
-                              <><AlertCircle className="h-3 w-3 text-amber-500" /> Pending</>
+                              <><AlertCircle className="h-3 w-3 shrink-0 text-amber-500" /> Pending</>
                             )}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-4 sm:mt-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"

@@ -222,42 +222,60 @@ export async function createResume(req, res) {
     }
   }
 
-  // Built resume: use the provided builder skills directly.
-  if (type === 'built' && Array.isArray(data?.skills) && data.skills.length > 0) {
-    try {
-      const user = await User.findById(req.user._id)
-      if (user) {
-        const extractedSkills = data.skills
-          .map((skill) => String(skill || '').trim())
-          .filter(Boolean)
-          .map((name) => ({ name, level: 'intermediate', years: 0, verified: false }))
+  // Built resume: use the provided builder skills directly + also run PDF parser.
+  if (type === 'built') {
+    // 1. Merge builder skills from the form into the user's profile
+    if (Array.isArray(data?.skills) && data.skills.length > 0) {
+      try {
+        const user = await User.findById(req.user._id)
+        if (user) {
+          const extractedSkills = data.skills
+            .map((skill) => String(skill || '').trim())
+            .filter(Boolean)
+            .map((name) => ({ name, level: 'intermediate', years: 0, verified: false }))
 
-        const { addedSkills } = await mergeSkillsIntoUserProfile(user, extractedSkills, {
-          verified: false,
-          category: 'resume-builder',
-        })
-
-        if (addedSkills.length > 0) {
-          await createUserNotification({
-            userId: user._id,
-            type: 'assessment',
-            title: 'Skills Added From Resume Builder',
-            message: `We added ${addedSkills.length} skill(s) from your built resume. Take assessments to verify them.`,
-            dedupeKey: `resume-builder-skills:${user._id}:${newResume._id}`,
-            metadata: {
-              source: 'resume-builder',
-              resumeId: String(newResume._id),
-              skills: addedSkills.map((skill) => skill.name),
-            },
+          const { addedSkills } = await mergeSkillsIntoUserProfile(user, extractedSkills, {
+            verified: false,
+            category: 'resume-builder',
           })
 
-          await notifyStudentForAllPublishedJobs(user._id)
+          if (addedSkills.length > 0) {
+            await createUserNotification({
+              userId: user._id,
+              type: 'skill_discovery',
+              title: `${addedSkills.length} Skills Added to Your Profile`,
+              message: `We added ${addedSkills.length} skill(s) from your resume: ${addedSkills.map(s => s.name).join(', ')}. Take assessments to verify them and unlock badges!`,
+              dedupeKey: `resume-builder-skills:${user._id}:${newResume._id}`,
+              metadata: {
+                source: 'resume-builder',
+                resumeId: String(newResume._id),
+                skillCount: addedSkills.length,
+                skills: addedSkills.map((skill) => ({
+                  name: skill.name,
+                  level: skill.level
+                })),
+              },
+            })
+
+            await notifyStudentForAllPublishedJobs(user._id)
+          }
         }
+      } catch (error) {
+        console.error('Failed to process built resume skills', error)
       }
-    } catch (error) {
-      console.error('Failed to process built resume skills', error)
+    }
+
+    // 2. Also run PDF parser — built resumes are uploaded as real PDFs to Cloudinary
+    if (fileUrl) {
+      try {
+        const { processResumeForUser } = await import('./resume.service.js')
+        await processResumeForUser(req.user._id, fileUrl, 'application/pdf')
+      } catch (err) {
+        console.error('Failed to run PDF parser on built resume', err)
+      }
     }
   }
+
 
   res.status(201).json({ resume: newResume })
 }

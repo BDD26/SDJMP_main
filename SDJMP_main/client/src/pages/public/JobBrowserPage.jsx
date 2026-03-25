@@ -28,81 +28,6 @@ import { Separator } from '@/components/ui/separator'
 import api from '@/services/api'
 import { toast } from 'sonner'
 
-const mockJobs = [
-  {
-    id: '1',
-    title: 'Senior Frontend Developer',
-    company: 'TechCorp Solutions',
-    location: 'San Francisco, CA',
-    type: 'Full-time',
-    salary: '$120k - $160k',
-    description: 'We are looking for a skilled Frontend Developer to join our team and build amazing user experiences using React, TypeScript, and modern web technologies.',
-    skills: ['React', 'TypeScript', 'Next.js', 'Tailwind CSS'],
-    posted: '2 days ago',
-    logo: 'TC',
-  },
-  {
-    id: '2',
-    title: 'Full Stack Engineer',
-    company: 'InnovateTech',
-    location: 'New York, NY',
-    type: 'Full-time',
-    salary: '$130k - $170k',
-    description: 'Join our dynamic team to build scalable web applications using modern technologies and cloud infrastructure.',
-    skills: ['React', 'Node.js', 'PostgreSQL', 'AWS'],
-    posted: '3 days ago',
-    logo: 'IT',
-  },
-  {
-    id: '3',
-    title: 'React Developer Intern',
-    company: 'StartupHub',
-    location: 'Austin, TX',
-    type: 'Internship',
-    salary: '$30/hour',
-    description: 'Great opportunity for students to learn and grow in a fast-paced startup environment building real products.',
-    skills: ['React', 'JavaScript', 'CSS', 'Git'],
-    posted: '1 day ago',
-    logo: 'SH',
-  },
-  {
-    id: '4',
-    title: 'Backend Engineer',
-    company: 'DataDriven Co',
-    location: 'Remote',
-    type: 'Full-time',
-    salary: '$100k - $140k',
-    description: 'Build robust APIs and microservices to power our data analytics platform serving millions of users.',
-    skills: ['Python', 'FastAPI', 'PostgreSQL', 'Redis'],
-    posted: '5 days ago',
-    logo: 'DD',
-  },
-  {
-    id: '5',
-    title: 'DevOps Engineer',
-    company: 'CloudScale Systems',
-    location: 'Seattle, WA',
-    type: 'Contract',
-    salary: '$80/hour',
-    description: 'Manage and optimize our cloud infrastructure, CI/CD pipelines, and monitoring systems.',
-    skills: ['AWS', 'Docker', 'Kubernetes', 'Terraform'],
-    posted: '1 week ago',
-    logo: 'CS',
-  },
-  {
-    id: '6',
-    title: 'Mobile Developer',
-    company: 'AppWorks',
-    location: 'Los Angeles, CA',
-    type: 'Full-time',
-    salary: '$110k - $150k',
-    description: 'Create beautiful and performant mobile applications for iOS and Android platforms.',
-    skills: ['React Native', 'TypeScript', 'iOS', 'Android'],
-    posted: '4 days ago',
-    logo: 'AW',
-  },
-]
-
 const jobTypes = ['Full-time', 'Part-time', 'Internship', 'Contract', 'Remote']
 const experienceLevels = ['Entry Level', 'Mid Level', 'Senior Level', 'Lead/Manager']
 const locations = ['Remote', 'San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA', 'Los Angeles, CA']
@@ -129,6 +54,35 @@ function formatSalary(salary) {
   return 'Not specified'
 }
 
+function formatJobType(type) {
+  const normalized = String(type || '').toLowerCase()
+  if (!normalized) return 'Full-time'
+  if (normalized === 'full-time' || normalized === 'full_time') return 'Full-time'
+  if (normalized === 'part-time' || normalized === 'part_time') return 'Part-time'
+  if (normalized === 'internship') return 'Internship'
+  if (normalized === 'contract') return 'Contract'
+  if (normalized === 'remote') return 'Remote'
+  return normalized.replace(/(^|[-_])([a-z])/g, (_, sep, ch) => `${sep ? ' ' : ''}${ch.toUpperCase()}`).trim()
+}
+
+function formatPostedDate(createdAt) {
+  if (!createdAt) return 'Recently'
+
+  const date = new Date(createdAt)
+  if (Number.isNaN(date.getTime())) return 'Recently'
+
+  return date.toLocaleDateString()
+}
+
+function buildLogo(company) {
+  const text = String(company || '').trim()
+  if (!text) return 'SM'
+  const words = text.split(/\s+/).filter(Boolean)
+  const first = words[0]?.[0] || 'S'
+  const second = (words[1]?.[0] || words[0]?.[1] || 'M')
+  return `${first}${second}`.toUpperCase()
+}
+
 export default function JobBrowserPage() {
   const [jobs, setJobs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
@@ -150,12 +104,12 @@ export default function JobBrowserPage() {
           return
         }
 
-        setJobs(liveJobs.length > 0 ? liveJobs : mockJobs)
+        setJobs(Array.isArray(liveJobs) ? liveJobs : [])
       } catch (error) {
         if (isMounted) {
-          setJobs(mockJobs)
+          setJobs([])
         }
-        toast.error('Unable to load live jobs, showing demo listings instead')
+        toast.error('Unable to load jobs right now')
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -175,7 +129,18 @@ export default function JobBrowserPage() {
       .map((job) => job.location)
       .filter(Boolean)
 
-    return ['Remote', ...new Set([...locations, ...dynamicLocations])]
+    const cleaned = (value) => String(value || '').trim()
+    const isRemote = (value) => cleaned(value).toLowerCase() === 'remote'
+
+    // Always keep a single "Remote" option first; avoid duplicates from DB data.
+    const uniqueNonRemote = new Set(
+      [...locations, ...dynamicLocations]
+        .map(cleaned)
+        .filter(Boolean)
+        .filter((loc) => !isRemote(loc))
+    )
+
+    return ['Remote', ...uniqueNonRemote]
   }, [jobs])
 
   const filteredJobs = jobs.filter((job) => {
@@ -416,7 +381,7 @@ export default function JobBrowserPage() {
                     <div className="flex gap-4">
                       {/* Company Logo */}
                       <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary font-bold">
-                        {job.logo}
+                        {buildLogo(job.company || job.companyName)}
                       </div>
 
                       {/* Job Details */}
@@ -431,8 +396,8 @@ export default function JobBrowserPage() {
                               <span>{job.company}</span>
                             </div>
                           </div>
-                          <Badge variant={job.type === 'Full-time' ? 'default' : 'secondary'}>
-                            {job.type}
+                          <Badge variant={formatJobType(job.type) === 'Full-time' ? 'default' : 'secondary'}>
+                            {formatJobType(job.type)}
                           </Badge>
                         </div>
 
@@ -451,12 +416,12 @@ export default function JobBrowserPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            {job.posted}
+                            {formatPostedDate(job.createdAt)}
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2 mt-4">
-                          {job.skills.map((skill) => (
+                          {(job.skills || []).map((skill) => (
                             <Badge key={skill} variant="outline">
                               {skill}
                             </Badge>
@@ -483,7 +448,7 @@ export default function JobBrowserPage() {
                     <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <h3 className="font-semibold text-lg mb-2">No jobs found</h3>
                     <p className="text-muted-foreground mb-4">
-                      Try adjusting your search or filters to find more opportunities.
+                      {isLoading ? 'Loading jobs...' : 'Try adjusting your search or filters to find more opportunities.'}
                     </p>
                     <Button variant="outline" onClick={clearFilters}>
                       Clear all filters
