@@ -294,6 +294,14 @@ export async function deleteResume(req, res) {
     }
   }
 
+  if (resume.fileUrl && resume.storageProvider === 'local') {
+    try {
+      await deleteLocalResumeFile(resume.fileUrl)
+    } catch (error) {
+      console.warn('Failed to delete local resume file', error)
+    }
+  }
+
   if (resume.isPrimary) {
     const nextResume = await Resume.findOne({ studentId: req.user._id }).sort({ createdAt: -1 })
     if (nextResume) {
