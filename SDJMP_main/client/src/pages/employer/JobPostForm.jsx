@@ -10,11 +10,9 @@ import {
   Save,
   Info,
   FileText,
-  Target,
-  AlertTriangle,
-  Users
+  Target
 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
+import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -330,60 +328,7 @@ export default function JobPostForm() {
               </div>
             </CardContent>
           </GlassCard>
-        </div>
-
-        {/* Sidebar: Skill Match Preview */}
-        <div className="space-y-6">
-          <GlassCard className="overflow-hidden sticky top-24">
-            <CardHeader className="bg-primary text-white">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Skill Match Preview
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mb-2">Skills Defined</p>
-                <div className="flex items-end gap-2">
-                  <span className="text-3xl font-black text-primary">{formData.skills.length}</span>
-                  <Badge className="bg-emerald-500 text-white mb-1">
-                    {formData.skills.length === 0
-                      ? 'No skills yet'
-                      : formData.skills.length === 1 ? '1 skill' : `${formData.skills.length} skills`}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  {formData.skills.length > 0
-                    ? <>Candidates will be matched based on your <b>weighted requirements</b>. A higher weight on a skill like <b>{formData.skills[0]?.name}</b> will prioritize candidates who possess it.</>
-                    : 'Add skill requirements and adjust their weights to enable precise, weighted matching for this role.'}
-                </p>
-                {formData.skills.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {formData.skills.map((s) => (
-                      <Badge key={s.name} variant="secondary">{s.name}</Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <Button variant="ghost" className="w-full text-xs text-primary gap-1" onClick={() => {}}>
-                <Info className="h-3 w-3" />
-                How skill matching works
-              </Button>
-            </CardContent>
-            <CardFooter className="bg-muted/5 border-t p-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-[10px] text-muted-foreground">
-                  Your job will be reviewed by placement admins within 24 hours. Ensure your company profile is up to date.
-                </p>
-              </div>
-            </CardFooter>
-          </GlassCard>
-        </div>
+        </div>  
       </div>
     </div>
   )

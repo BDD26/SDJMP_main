@@ -11,6 +11,7 @@ import {
   ChevronLeft, 
   Timer, 
   AlertTriangle,
+  AlertCircle,
   Award,
   BookOpen,
   Trophy,
