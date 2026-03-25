@@ -2,41 +2,51 @@ import User from '../users/user.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { mergeSkillsIntoUserProfile, normalizeSkillPayload } from './skill-inventory.service.js'
 import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
+import Skill from './skill.model.js'
+import { serializeSkill } from './skills.service.js'
+import { defaultSkillLibrary } from './default-skill-library.js'
+
+async function ensureDefaultSkillLibrary() {
+  await Skill.bulkWrite(
+    defaultSkillLibrary.map((skill) => ({
+      updateOne: {
+        filter: { name: skill.name },
+        update: { $setOnInsert: skill },
+        upsert: true,
+      },
+    })),
+    { ordered: false }
+  )
+}
 
 export async function getAllSkills(req, res) {
-  const users = await User.find({ role: 'student' }).select('profile.skills').lean()
-  const names = new Set()
+  await ensureDefaultSkillLibrary()
 
-  for (const user of users) {
-    for (const skill of user.profile?.skills || []) {
-      const name = String(skill?.name || '').trim()
-      if (name) names.add(name)
-    }
-  }
+  const skills = await Skill.find({})
+    .sort({ category: 1, name: 1 })
+    .lean()
 
-  const skills = Array.from(names)
-    .sort((a, b) => a.localeCompare(b))
-    .map((name) => ({ name, category: 'user-profile' }))
-
-  res.status(200).json(skills)
+  res.status(200).json(skills.map(serializeSkill))
 }
 
 export async function getPopularSkills(req, res) {
-  const rows = await User.aggregate([
-    { $unwind: { path: '$profile.skills', preserveNullAndEmptyArrays: false } },
-    { $match: { 'profile.skills.name': { $type: 'string', $ne: '' } } },
-    { $group: { _id: { $toLower: '$profile.skills.name' }, count: { $sum: 1 }, sample: { $first: '$profile.skills.name' } } },
-    { $sort: { count: -1, sample: 1 } },
-    { $limit: 12 },
-  ])
+  await ensureDefaultSkillLibrary()
 
-  const skills = rows.map((row) => ({
-    name: row.sample,
-    popularity: row.count,
-    category: 'user-profile',
-  }))
+  const skills = await Skill.find({})
+    .sort({ growth: -1, demand: -1, popularity: -1, name: 1 })
+    .limit(12)
+    .lean()
 
-  res.status(200).json(skills)
+  res.status(200).json(
+    skills.map((skill) => ({
+      id: String(skill._id),
+      name: skill.name,
+      growth: `+${Math.max(0, Number(skill.growth) || 0)}%`,
+      growthValue: Math.max(0, Number(skill.growth) || 0),
+      category: skill.category || 'general',
+      popularity: skill.popularity || 0,
+    }))
+  )
 }
 
 export async function addSkillToProfile(req, res) {
