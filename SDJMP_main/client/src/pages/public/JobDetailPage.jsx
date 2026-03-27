@@ -145,6 +145,8 @@ export default function JobDetailPage() {
   const [selectedResume, setSelectedResume] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [applicationSubmitted, setApplicationSubmitted] = useState(false)
+  const [existingApplication, setExistingApplication] = useState(null)
+  const [isCheckingApplication, setIsCheckingApplication] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -178,6 +180,7 @@ export default function JobDetailPage() {
     if (!isAuthenticated || user?.role !== 'student') {
       setResumes([])
       setSelectedResume('')
+      setExistingApplication(null)
       return
     }
 
@@ -206,6 +209,34 @@ export default function JobDetailPage() {
       isMounted = false
     }
   }, [isAuthenticated, user?.role])
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'student' || !id) {
+      setExistingApplication(null)
+      return
+    }
+
+    let isMounted = true
+
+    async function loadApplicationStatus() {
+      try {
+        setIsCheckingApplication(true)
+        const result = await api.applications.getMyForJob(id)
+        if (!isMounted) return
+        setExistingApplication(result?.application || null)
+      } catch {
+        if (!isMounted) return
+        setExistingApplication(null)
+      } finally {
+        if (isMounted) setIsCheckingApplication(false)
+      }
+    }
+
+    loadApplicationStatus()
+    return () => {
+      isMounted = false
+    }
+  }, [id, isAuthenticated, user?.role])
 
   const matchScore = useMemo(() => calculateMatch(job, user), [job, user])
   const matchBreakdown = useMemo(() => buildMatchBreakdown(job, user, matchScore), [job, user, matchScore])
@@ -248,6 +279,12 @@ export default function JobDetailPage() {
       return
     }
 
+    if (existingApplication) {
+      toast.info('You have already applied to this job')
+      navigate('/student/applications')
+      return
+    }
+
     setApplicationSubmitted(false)
     setIsApplyModalOpen(true)
   }
@@ -262,7 +299,9 @@ export default function JobDetailPage() {
       setIsSubmitting(true)
       await api.applications.apply(id, { resumeId: selectedResume })
       setApplicationSubmitted(true)
+      setExistingApplication({ jobId: id })
       toast.success('Application submitted successfully')
+      window.dispatchEvent(new CustomEvent('skillmatch:data-changed', { detail: { type: 'application', jobId: id } }))
     } catch (error) {
       toast.error(error?.message || 'Failed to submit application')
     } finally {
@@ -436,9 +475,24 @@ export default function JobDetailPage() {
                 )}
               </CardContent>
               <CardFooter className="flex flex-col gap-3 border-t bg-muted/5 pt-6">
-                <Button className="h-12 w-full text-lg font-bold shadow-lg shadow-primary/20" onClick={handleApply}>
-                  Apply Now
-                </Button>
+                {existingApplication ? (
+                  <>
+                    <Button className="h-12 w-full text-lg font-bold" variant="secondary" disabled>
+                      Applied
+                    </Button>
+                    <Button asChild variant="outline" className="h-11 w-full font-bold">
+                      <Link to="/student/applications">View in Applications</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    className="h-12 w-full text-lg font-bold shadow-lg shadow-primary/20"
+                    onClick={handleApply}
+                    disabled={isCheckingApplication}
+                  >
+                    {isCheckingApplication ? 'Checking...' : 'Apply Now'}
+                  </Button>
+                )}
                 <p className="px-4 text-center text-[10px] text-muted-foreground">
                   By applying, you agree to share your profile and resume with <b>{job.company}</b>.
                 </p>

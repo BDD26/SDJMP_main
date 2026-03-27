@@ -142,6 +142,26 @@ export async function getApplicationsForJob(req, res) {
   res.status(200).json(result)
 }
 
+export async function getMyApplicationForJob(req, res) {
+  if (req.user.role !== 'student') {
+    throw createHttpError(403, 'Only students can access job application status')
+  }
+
+  const application = await Application.findOne({
+    jobId: req.params.jobId,
+    studentId: req.user._id,
+  })
+    .populate('jobId')
+    .populate('resumeId')
+
+  if (!application) {
+    res.status(200).json({ applied: false, application: null })
+    return
+  }
+
+  res.status(200).json({ applied: true, application: serializeApplication(application) })
+}
+
 export async function updateInterviewStatus(req, res) {
   const application = await Application.findById(req.params.applicationId)
 

@@ -5,6 +5,7 @@ import { asyncHandler } from '../../utils/async-handler.js'
 import {
   createApplication,
   getApplicationsForJob,
+  getMyApplicationForJob,
   getMyApplications,
   updateApplicationStatus,
   updateInterviewStatus,
@@ -20,6 +21,7 @@ const applicationsRouter = Router()
 applicationsRouter.use(requireAuth)
 applicationsRouter.get('/my', requireRole(['student']), asyncHandler(getMyApplications))
 applicationsRouter.get('/student', requireRole(['student']), asyncHandler(getMyApplications))
+applicationsRouter.get('/job/:jobId/my', requireRole(['student']), asyncHandler(getMyApplicationForJob))
 applicationsRouter.get(
   '/job/:jobId',
   requireRole(['employer', 'super_admin']),

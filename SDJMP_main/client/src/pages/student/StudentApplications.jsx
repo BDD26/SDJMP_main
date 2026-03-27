@@ -49,6 +49,17 @@ export default function StudentApplications() {
   }, [])
 
   useEffect(() => {
+    const handler = (event) => {
+      if (event?.detail?.type === 'application') {
+        fetchApplications()
+      }
+    }
+
+    window.addEventListener('skillmatch:data-changed', handler)
+    return () => window.removeEventListener('skillmatch:data-changed', handler)
+  }, [])
+
+  useEffect(() => {
     filterAndSortApplications()
   }, [applications, statusFilter, sortBy])
 

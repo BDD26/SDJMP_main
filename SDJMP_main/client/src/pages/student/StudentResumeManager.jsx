@@ -564,13 +564,13 @@ export default function StudentResumeManager() {
         type: 'uploaded',
         fileUrl: uploadedAsset.fileUrl,
         filePublicId: uploadedAsset.filePublicId,
-        storageProvider: 'cloudinary',
+        storageProvider: uploadedAsset.storageProvider,
         data: {
           mimeType: file.type,
           originalName: file.name,
           size: uploadedAsset.bytes || file.size,
           resourceType: uploadedAsset.resourceType,
-          storageProvider: 'cloudinary',
+          storageProvider: uploadedAsset.storageProvider,
         }
       })
       toast.success('Resume uploaded successfully! Any detected skills have been added.')
@@ -603,12 +603,12 @@ export default function StudentResumeManager() {
         type: 'built',
         fileUrl: uploadedAsset.fileUrl,
         filePublicId: uploadedAsset.filePublicId,
-        storageProvider: 'cloudinary',
+        storageProvider: uploadedAsset.storageProvider,
         data: {
           ...resumeData,
           mimeType: 'application/pdf',
           size: uploadedAsset.bytes || pdfFile.size,
-          storageProvider: 'cloudinary',
+          storageProvider: uploadedAsset.storageProvider,
         }
       })
       setShowBuilder(false)

@@ -216,7 +216,31 @@ export async function createResume(req, res) {
   if (type === 'uploaded' && fileUrl) {
     try {
       const { processResumeForUser } = await import('./resume.service.js')
-      await processResumeForUser(req.user._id, fileUrl, data?.mimeType || 'application/pdf')
+      const parseResult = await processResumeForUser(req.user._id, fileUrl, data?.mimeType || 'application/pdf')
+
+      // Mark uploaded resumes as verified once they have been successfully parsed.
+      if (parseResult?.parsed) {
+        newResume.status = 'verified'
+        newResume.atsScore = Math.max(Number(newResume.atsScore) || 0, 70)
+
+        const nextData = (newResume.data && typeof newResume.data === 'object') ? { ...newResume.data } : {}
+        nextData.parsing = {
+          parsedAt: new Date(),
+          textLength: parseResult.textLength || 0,
+          matchedSkillsCount: parseResult.matchedSkillsCount || 0,
+          addedSkillsCount: parseResult.addedSkillsCount || 0,
+        }
+        newResume.data = nextData
+        newResume.markModified('data')
+
+        await newResume.save()
+      } else if (parseResult?.error) {
+        const nextData = (newResume.data && typeof newResume.data === 'object') ? { ...newResume.data } : {}
+        nextData.parsingError = String(parseResult.error)
+        newResume.data = nextData
+        newResume.markModified('data')
+        await newResume.save()
+      }
     } catch (err) {
       console.error('Failed to load resume service or parse document', err)
     }
@@ -242,7 +266,7 @@ export async function createResume(req, res) {
           if (addedSkills.length > 0) {
             await createUserNotification({
               userId: user._id,
-              type: 'skill_discovery',
+              type: 'system',
               title: `${addedSkills.length} Skills Added to Your Profile`,
               message: `We added ${addedSkills.length} skill(s) from your resume: ${addedSkills.map(s => s.name).join(', ')}. Take assessments to verify them and unlock badges!`,
               dedupeKey: `resume-builder-skills:${user._id}:${newResume._id}`,
@@ -269,7 +293,19 @@ export async function createResume(req, res) {
     if (fileUrl) {
       try {
         const { processResumeForUser } = await import('./resume.service.js')
-        await processResumeForUser(req.user._id, fileUrl, 'application/pdf')
+        const parseResult = await processResumeForUser(req.user._id, fileUrl, 'application/pdf')
+        if (parseResult?.parsed) {
+          const nextData = (newResume.data && typeof newResume.data === 'object') ? { ...newResume.data } : {}
+          nextData.parsing = {
+            parsedAt: new Date(),
+            textLength: parseResult.textLength || 0,
+            matchedSkillsCount: parseResult.matchedSkillsCount || 0,
+            addedSkillsCount: parseResult.addedSkillsCount || 0,
+          }
+          newResume.data = nextData
+          newResume.markModified('data')
+          await newResume.save()
+        }
       } catch (err) {
         console.error('Failed to run PDF parser on built resume', err)
       }

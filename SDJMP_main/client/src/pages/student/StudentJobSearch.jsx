@@ -33,10 +33,42 @@ function formatSalary(salary) {
 export default function StudentJobSearch() {
   const [searchTerm, setSearchTerm] = useState('')
   const [jobs, setJobs] = useState([])
+  const [appliedJobIds, setAppliedJobIds] = useState(() => new Set())
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     fetchMatches()
+    fetchAppliedJobs()
+  }, [])
+
+  useEffect(() => {
+    const handler = (event) => {
+      if (event?.detail?.type === 'application' && event?.detail?.jobId) {
+        setAppliedJobIds((prev) => new Set([...prev, String(event.detail.jobId)]))
+      }
+      fetchMatches()
+      fetchAppliedJobs()
+    }
+
+    window.addEventListener('skillmatch:data-changed', handler)
+    return () => window.removeEventListener('skillmatch:data-changed', handler)
+  }, [])
+
+  useEffect(() => {
+    const onFocus = () => fetchMatches()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMatches()
+    }
+
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    const interval = setInterval(fetchMatches, 15000)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
 
@@ -49,6 +81,16 @@ export default function StudentJobSearch() {
       toast.error('Failed to load job matches')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchAppliedJobs = async () => {
+    try {
+      const applications = await api.applications.getMyApplications()
+      const next = new Set((applications || []).map((app) => String(app.jobId || app.job?.id || app.job?._id || '')).filter(Boolean))
+      setAppliedJobIds(next)
+    } catch {
+      // Non-blocking for job matches view
     }
   }
 
@@ -88,6 +130,7 @@ export default function StudentJobSearch() {
           const displayJob = job || {}
           const matchScore = displayJob.matchScore || 0
           const jobId = displayJob.id || displayJob._id
+          const isApplied = jobId ? appliedJobIds.has(String(jobId)) : false
 
           return (
             <Card key={jobId} className="hover:shadow-lg transition-shadow overflow-hidden group">
@@ -98,6 +141,11 @@ export default function StudentJobSearch() {
                       <Link to={jobId ? `/jobs/${jobId}` : '/student/jobs'}>{displayJob.title}</Link>
                     </h3>
                     <p className="text-muted-foreground">{displayJob.company}</p>
+                    {isApplied ? (
+                      <Badge className="mt-2 bg-emerald-500/10 text-emerald-700 border-none" variant="secondary">
+                        Applied
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-1">
@@ -146,5 +194,3 @@ export default function StudentJobSearch() {
     </div>
   )
 }
-
-

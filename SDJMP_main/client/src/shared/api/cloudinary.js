@@ -40,6 +40,7 @@ export async function uploadResumeAsset(file, { publicId, fileName } = {}) {
       originalFilename: payload.original_filename || fileName || file?.name || 'resume',
       format: payload.format || '',
       resourceType: payload.resource_type || 'raw',
+      storageProvider: 'cloudinary',
     }
   } catch (error) {
     // Fallback to local upload
@@ -61,13 +62,15 @@ export async function uploadResumeAsset(file, { publicId, fileName } = {}) {
     }
     
     const result = await response.json()
+    const serverBaseUrl = String(env.apiBaseUrl || '').replace(/\/api\/?$/i, '')
     return {
-      fileUrl: `${env.apiBaseUrl}${result.resume.fileUrl}`,
+      fileUrl: `${serverBaseUrl}${result.resume.fileUrl}`,
       filePublicId: result.resume.filePublicId,
       bytes: result.resume.data?.size || file.size,
       originalFilename: fileName || file?.name || 'resume',
       format: fileName?.split('.').pop() || 'pdf',
       resourceType: 'raw',
+      storageProvider: 'local',
     }
   }
 }

@@ -21,7 +21,13 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false, // OPTIMIZATION: Disable sourcemaps in production (save 832KB)
+    minify: 'terser', // Ensure aggressive minification
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console logs in production
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -52,6 +58,16 @@ export default defineConfig({
             id.includes('/zod/')
           ) {
             return 'forms'
+          }
+
+          // OPTIMIZATION: Separate radix-ui to its own chunk
+          if (id.includes('@radix-ui')) {
+            return 'radix-ui'
+          }
+
+          // OPTIMIZATION: Separate utility libraries
+          if (id.includes('date-fns') || id.includes('clsx') || id.includes('class-variance-authority')) {
+            return 'utils'
           }
 
           return undefined

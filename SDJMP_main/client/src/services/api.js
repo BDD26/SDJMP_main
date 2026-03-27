@@ -260,6 +260,13 @@ export const applicationsAPI = {
     return (Array.isArray(payload) ? payload : []).map(normalizeApplication).filter(Boolean)
   },
   getForJob: (jobId) => apiRequest(`/applications/job/${jobId}`),
+  getMyForJob: async (jobId) => {
+    const payload = await apiRequest(`/applications/job/${jobId}/my`)
+    return {
+      applied: Boolean(payload?.applied),
+      application: payload?.application ? normalizeApplication(payload.application) : null,
+    }
+  },
   apply: (jobId, applicationData) =>
     apiRequest('/applications', {
       method: 'post',

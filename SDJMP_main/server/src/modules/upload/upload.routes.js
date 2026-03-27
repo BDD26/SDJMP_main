@@ -61,7 +61,8 @@ uploadRouter.post('/resume', upload.single('file'), asyncHandler(async (req, res
       user: req.user 
     }, res)
 
-    res.status(201).json(result)
+    // `createResume` writes the response to `res` directly.
+    return result
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

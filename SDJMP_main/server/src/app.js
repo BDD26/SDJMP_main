@@ -1,4 +1,5 @@
 import cookieParser from 'cookie-parser'
+import compression from 'compression'
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
@@ -12,7 +13,6 @@ import applicationsRouter from './modules/applications/applications.routes.js'
 import assessmentsRouter from './modules/assessments/assessments.routes.js'
 import authRouter from './modules/auth/auth.routes.js'
 import dashboardRouter from './modules/student/dashboard.routes.js'
-import debugRouter from './modules/student/debug.routes.js'
 import uploadRouter from './modules/upload/upload.routes.js'
 import employerRouter from './modules/employer/employer.routes.js'
 import healthRouter from './modules/health/health.routes.js'
@@ -33,6 +33,7 @@ const localDevOrigins = [
 const allowedOrigins = new Set([env.clientUrl, ...localDevOrigins])
 
 app.use(helmet())
+app.use(compression())
 app.use(
   cors({
     origin(origin, callback) {
@@ -49,6 +50,8 @@ app.use(
 app.use(express.json())
 app.use(cookieParser())
 app.use('/uploads', express.static('uploads'))
+// Backwards-compat: some clients mistakenly prefix static uploads with `/api`.
+app.use('/api/uploads', express.static('uploads'))
 app.use(morgan(env.isProduction ? 'combined' : 'dev'))
 app.use(
   rateLimit({
@@ -76,7 +79,6 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/employer', employerRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/student/dashboard', dashboardRouter)
-app.use('/api/student/debug', debugRouter)
 app.use('/api/upload', uploadRouter)
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { User, GraduationCap, Code, Briefcase, Award, Plus, Pencil, Trash2, ChevronRight, Globe, MapPin, CheckCircle2, AlertCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { User, GraduationCap, Code, Briefcase, Award, Plus, Pencil, Trash2, ChevronRight, Globe, MapPin, CheckCircle2, AlertCircle, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,8 @@ export default function StudentProfile() {
   const [editingIndex, setEditingIndex] = useState(null)
   const [formValues, setFormValues] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [skillsQuery, setSkillsQuery] = useState('')
+  const [showAllSkills, setShowAllSkills] = useState(false)
 
   useEffect(() => {
     const nextProfile = getEmptyState(user)
@@ -55,6 +57,14 @@ export default function StudentProfile() {
   const openModal = (modal, item = null, index = null) => {
     setActiveModal(modal)
     setEditingIndex(index)
+
+    if (modal === 'basics') {
+      setFormValues({
+        bio: profileData.bio || '',
+        location: profileData.location || '',
+      })
+      return
+    }
 
     if (modal === 'preferences') {
       setFormValues({
@@ -90,7 +100,10 @@ export default function StudentProfile() {
     try {
       let nextProfile = { ...profileData }
 
-      if (activeModal === 'skills') {
+      if (activeModal === 'basics') {
+        nextProfile.bio = formValues.bio || ''
+        nextProfile.location = formValues.location || ''
+      } else if (activeModal === 'skills') {
         const skill = { name: formValues.name || 'New Skill', level: formValues.level || 'intermediate', years: Number(formValues.years) || 0 }
         nextProfile.skills = editingIndex !== null ? nextProfile.skills.map((item, index) => index === editingIndex ? skill : item) : [...nextProfile.skills, skill]
       } else if (activeModal === 'education') {
@@ -144,6 +157,27 @@ export default function StudentProfile() {
     }
   }
 
+  const filteredSkills = useMemo(() => {
+    const query = skillsQuery.trim().toLowerCase()
+    const source = Array.isArray(profileData.skills) ? profileData.skills : []
+
+    const filtered = query
+      ? source.filter((skill) => String(skill?.name || '').toLowerCase().includes(query))
+      : source
+
+    return filtered.slice().sort((a, b) => {
+      const aVerified = Boolean(a?.verified)
+      const bVerified = Boolean(b?.verified)
+      if (aVerified !== bVerified) return aVerified ? -1 : 1
+      return String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { sensitivity: 'base' })
+    })
+  }, [profileData.skills, skillsQuery])
+
+  const visibleSkills = useMemo(() => {
+    if (showAllSkills) return filteredSkills
+    return filteredSkills.slice(0, 12)
+  }, [filteredSkills, showAllSkills])
+
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-12 animate-fade-in">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -172,8 +206,16 @@ export default function StudentProfile() {
         <div className="space-y-8">
           <Card className="border-none shadow-xl glass">
             <CardHeader>
-              <CardTitle className="text-lg">Profile Snapshot</CardTitle>
-              <CardDescription>Your public basics and job preferences</CardDescription>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">Profile Snapshot</CardTitle>
+                  <CardDescription>Your public basics and job preferences</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="rounded-xl" onClick={() => openModal('basics')}>
+                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                  Edit
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -222,18 +264,64 @@ export default function StudentProfile() {
               <Button variant="ghost" size="icon" onClick={() => openModal('skills')} className="h-8 w-8 rounded-full"><Plus className="h-4 w-4 text-primary" /></Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {profileData.skills.length > 0 ? profileData.skills.map((skill, index) => (
-                <div key={`${skill.name}-${index}`} className="p-3 rounded-xl border bg-background/50 group">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-bold text-sm">{skill.name}</span>
-                    <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-tighter py-0">{skill.level}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                    <span>Experience: {skill.years} {skill.years === 1 ? 'Year' : 'Years'}</span>
-                    <span className="group-hover:text-primary transition-colors cursor-pointer" onClick={() => openModal('skills', skill, index)}>Edit</span>
-                  </div>
+              {profileData.skills.length > 10 ? (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={skillsQuery}
+                    onChange={(event) => setSkillsQuery(event.target.value)}
+                    placeholder="Filter skills..."
+                    className="pl-9 rounded-xl"
+                  />
                 </div>
-              )) : <SectionEmpty>No skills added yet. Add your strongest tools so employers can match you correctly.</SectionEmpty>}
+              ) : null}
+
+              {filteredSkills.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  {visibleSkills.map((skill, index) => (
+                    <div key={`${skill.name}-${index}`} className="p-3 rounded-xl border bg-background/50 group flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm truncate">{skill.name}</span>
+                          {skill.verified ? (
+                            <Badge className="text-[10px] h-5 bg-emerald-500/10 text-emerald-600 border-none">Verified</Badge>
+                          ) : null}
+                          <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-tighter py-0">{skill.level}</Badge>
+                        </div>
+                        <p className="mt-2 text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                          Experience: {skill.years} {skill.years === 1 ? 'Year' : 'Years'}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={() => {
+                          const idx = profileData.skills.findIndex(
+                            (s) =>
+                              s?.name === skill?.name &&
+                              s?.level === skill?.level &&
+                              Number(s?.years) === Number(skill?.years)
+                          )
+                          openModal('skills', skill, idx >= 0 ? idx : null)
+                        }}
+                        aria-label={`Edit ${skill.name}`}
+                        title="Edit"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <SectionEmpty>No skills added yet. Add your strongest tools so employers can match you correctly.</SectionEmpty>
+              )}
+
+              {filteredSkills.length > 12 ? (
+                <Button variant="secondary" className="w-full rounded-xl" onClick={() => setShowAllSkills((value) => !value)}>
+                  {showAllSkills ? 'Show fewer skills' : `Show all skills (${filteredSkills.length})`}
+                </Button>
+              ) : null}
               <Button variant="outline" className="w-full border-dashed group" onClick={() => openModal('skills')}>
                 <Plus className="h-4 w-4 mr-2 group-hover:rotate-90 transition-transform" />
                 Add New Skill
@@ -320,10 +408,39 @@ export default function StudentProfile() {
         <DialogContent className="sm:max-w-[450px] border-none shadow-2xl glass-modal p-0 overflow-hidden">
           <div className="h-1.5 bg-primary w-full" />
           <DialogHeader className="p-6">
-            <DialogTitle className="text-2xl font-bold capitalize">{activeModal === 'certifications' ? 'Certification Editor' : `${activeModal} Editor`}</DialogTitle>
+            <DialogTitle className="text-2xl font-bold capitalize">
+              {activeModal === 'basics'
+                ? 'Profile Basics'
+                : activeModal === 'certifications'
+                  ? 'Certification Editor'
+                  : activeModal === 'preferences'
+                    ? 'Job Preferences'
+                    : `${activeModal} Editor`}
+            </DialogTitle>
             <DialogDescription>Keep your profile up-to-date to ensure the best matching results.</DialogDescription>
           </DialogHeader>
           <div className="p-6 pt-0 space-y-6">
+            {activeModal === 'basics' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Bio</Label>
+                  <Textarea
+                    placeholder="A short intro about your strengths and interests..."
+                    value={formValues.bio || ''}
+                    onChange={(event) => setFormValues((value) => ({ ...value, bio: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Location</Label>
+                  <Input
+                    placeholder="e.g. Ahmedabad, India"
+                    value={formValues.location || ''}
+                    onChange={(event) => setFormValues((value) => ({ ...value, location: event.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
             {activeModal === 'skills' && (
               <div className="space-y-4">
                 <div className="space-y-2">

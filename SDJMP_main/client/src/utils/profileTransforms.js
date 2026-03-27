@@ -22,7 +22,8 @@ function normalizeSkills(skills = []) {
         return {
           name: skill.trim(),
           level: 'intermediate',
-          years: 1,
+          years: 0,
+          verified: false,
         }
       }
 
@@ -31,6 +32,7 @@ function normalizeSkills(skills = []) {
         name: normalizeString(skill?.name),
         level: skill?.level || 'intermediate',
         years: Number.isFinite(Number(skill?.years)) ? Number(skill.years) : 0,
+        verified: Boolean(skill?.verified),
       }
     })
     .filter((skill) => skill.name)
