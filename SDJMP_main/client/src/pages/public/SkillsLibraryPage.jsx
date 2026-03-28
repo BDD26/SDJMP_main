@@ -346,24 +346,24 @@ export default function SkillsLibraryPage() {
       </div>
 
       <Dialog open={!!selectedSkill} onOpenChange={() => setSelectedSkill(null)}>
-        <DialogContent className="sm:max-w-[500px] border-none shadow-2xl p-0 overflow-hidden glass-modal" showCloseButton={false}>
+        <DialogContent className="sm:max-w-[500px] max-w-[95vw] border-none shadow-2xl p-0 overflow-hidden glass-modal" showCloseButton={false}>
           <div className="h-2 bg-primary w-full" />
-          <DialogHeader className="p-6 pb-0">
+          <DialogHeader className="p-4 sm:p-6 pb-0">
             <div className="flex items-center justify-between mb-4">
-              <Badge variant="outline" className="text-primary border-primary/20">
+              <Badge variant="outline" className="text-primary border-primary/20 text-xs sm:text-sm">
                 Learning Path
               </Badge>
               <Button variant="ghost" size="icon" onClick={() => setSelectedSkill(null)} className="h-8 w-8 rounded-full">
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <DialogTitle className="text-3xl font-bold">{selectedSkill?.name}</DialogTitle>
-            <DialogDescription className="text-base text-muted-foreground">
+            <DialogTitle className="text-2xl sm:text-3xl font-bold leading-tight">{selectedSkill?.name}</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Follow these curated resources to master {selectedSkill?.name} and prepare for top-tier roles.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="p-6 space-y-4">
+          <div className="p-4 sm:p-6 space-y-4">
             <h4 className="font-bold text-sm uppercase tracking-widest text-primary flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Recommended Resources
@@ -394,14 +394,40 @@ export default function SkillsLibraryPage() {
               ))}
             </div>
 
-            <div className="mt-8 p-4 rounded-xl bg-primary text-primary-foreground relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 blur-xl rounded-full translate-x-1/2 -translate-y-1/2 group-hover:scale-150 transition-transform duration-1000" />
+            <div className="mt-6 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-blue-200/30 blur-xl rounded-full translate-x-1/2 -translate-y-1/2 group-hover:scale-150 transition-transform duration-1000" />
               <div className="relative z-10">
-                <h5 className="font-bold mb-1">Get Certified</h5>
-                <p className="text-xs text-primary-foreground/80 mb-3">
+                <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                  <Youtube className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                  <h5 className="font-bold text-blue-900 text-sm sm:text-base">Video Tutorial</h5>
+                </div>
+                <p className="text-xs sm:text-sm text-blue-700 mb-3 leading-relaxed">
+                  Watch a comprehensive video guide to master {selectedSkill?.name} from basics to advanced concepts.
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full font-bold border-blue-300 text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-all text-xs sm:text-sm h-9 sm:h-10"
+                  asChild
+                >
+                  <Link to={`/course/${selectedSkill?.name?.toLowerCase()}`} onClick={() => setSelectedSkill(null)}>
+                    <Youtube className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    <span className="hidden xs:inline">View Video Tutorial</span>
+                    <span className="xs:hidden sm:inline">Video Tutorial</span>
+                    <ChevronRight className="h-2 w-2 sm:h-3 sm:w-3 ml-1 sm:ml-2" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 p-3 sm:p-4 rounded-xl bg-primary text-primary-foreground relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-white/10 blur-xl rounded-full translate-x-1/2 -translate-y-1/2 group-hover:scale-150 transition-transform duration-1000" />
+              <div className="relative z-10">
+                <h5 className="font-bold mb-1 text-sm sm:text-base">Get Certified</h5>
+                <p className="text-xs sm:text-sm text-primary-foreground/80 mb-3 leading-relaxed">
                   Validate your skills with our industry-recognized certification.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full font-bold shadow-lg shadow-black/10" asChild>
+                <Button variant="secondary" size="sm" className="w-full font-bold shadow-lg shadow-black/10 text-xs sm:text-sm h-9 sm:h-10" asChild>
                   <Link to="/student/assessments" onClick={() => setSelectedSkill(null)}>
                     Start Assessment
                   </Link>

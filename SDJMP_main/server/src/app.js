@@ -20,6 +20,7 @@ import jobsRouter from './modules/jobs/jobs.routes.js'
 import notificationsRouter from './modules/notifications/notifications.routes.js'
 import skillsRouter from './modules/skills/skills.routes.js'
 import usersRouter from './modules/users/users.routes.js'
+import courseRoutes from './routes/course.routes.js';
 
 const app = express()
 const localDevOrigins = [
@@ -79,6 +80,7 @@ app.use('/api/notifications', notificationsRouter)
 app.use('/api/employer', employerRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/student/dashboard', dashboardRouter)
+app.use('/api/courses', courseRoutes)
 app.use('/api/upload', uploadRouter)
 app.use(notFoundMiddleware)
 app.use(errorMiddleware)

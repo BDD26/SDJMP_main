@@ -43,6 +43,7 @@ export const router = createBrowserRouter([
           { path: 'jobs', lazy: lazyComponent(() => import('@/pages/public/JobBrowserPage')) },
           { path: 'jobs/:id', lazy: lazyComponent(() => import('@/pages/public/JobDetailPage')) },
           { path: 'skills', lazy: lazyComponent(() => import('@/pages/public/SkillsLibraryPage')) },
+          { path: 'course/:skill', lazy: lazyComponent(() => import('@/pages/public/CoursePlayerPage')) },
           { path: 'about', lazy: lazyComponent(() => import('@/pages/public/AboutPage')) },
         ],
       },
