@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { coursesAPI } from '@/services/api'
 import {
   Play,
   Clock,
@@ -27,169 +28,137 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-// Sample course data - this will come from MongoDB Atlas later
-const courseData = {
-  skill: 'React',
-  title: 'Complete React Development Course',
-  description: 'Master React from basics to advanced concepts',
-  totalLessons: 12,
-  completedLessons: 3,
-  duration: '8h 45m',
-  instructor: 'Sarah Johnson',
-  level: 'Intermediate',
-  students: 15420,
-  rating: 4.8,
-  lastUpdated: '2024-03-15',
-  modules: [
-    {
-      id: 'intro',
-      title: 'Introduction to React',
-      description: 'Get started with React fundamentals',
-      lessons: [
-        {
-          id: 'react-101',
-          title: 'What is React?',
-          description: 'Understanding React basics and core concepts',
-          duration: '12:45',
-          videoId: 'TLVir_-bX8k',
-          completed: true,
-        },
-        {
-          id: 'react-102',
-          title: 'Setting Up Development Environment',
-          description: 'Install Node.js, npm, and create your first React app',
-          duration: '15:30',
-          videoId: 'Ke90TjeGeVS',
-          completed: true,
-        },
-        {
-          id: 'react-103',
-          title: 'Components and Props',
-          description: 'Learn about React components and how to pass data',
-          duration: '18:20',
-          videoId: 'IrHmgOSlDv0',
-          completed: true,
-        },
-      ],
-    },
-    {
-      id: 'core',
-      title: 'Core React Concepts',
-      description: 'Deep dive into React fundamentals',
-      lessons: [
-        {
-          id: 'react-201',
-          title: 'State and Lifecycle',
-          description: 'Understanding component state and lifecycle methods',
-          duration: '22:15',
-          videoId: 'TNhaISOUy6Q',
-          completed: false,
-        },
-        {
-          id: 'react-202',
-          title: 'Handling Events',
-          description: 'Learn how to handle user events in React',
-          duration: '16:40',
-          videoId: 'B2JAj4F9k8Y',
-          completed: false,
-        },
-        {
-          id: 'react-203',
-          title: 'Conditional Rendering',
-          description: 'Render components based on conditions',
-          duration: '14:25',
-          videoId: 'yIeKlL-3V4g',
-          completed: false,
-        },
-        {
-          id: 'react-204',
-          title: 'Lists and Keys',
-          description: 'Working with arrays and rendering lists',
-          duration: '19:10',
-          videoId: 'Qs1xzz2_c4M',
-          completed: false,
-        },
-      ],
-    },
-    {
-      id: 'advanced',
-      title: 'Advanced React',
-      description: 'Advanced patterns and best practices',
-      lessons: [
-        {
-          id: 'react-301',
-          title: 'Hooks Deep Dive',
-          description: 'Master useState, useEffect, and custom hooks',
-          duration: '28:35',
-          videoId: 'TNhaISOUy6Q',
-          completed: false,
-        },
-        {
-          id: 'react-302',
-          title: 'Context API',
-          description: 'Global state management with Context',
-          duration: '24:20',
-          videoId: '5LrDiIWnIgs',
-          completed: false,
-        },
-        {
-          id: 'react-303',
-          title: 'Performance Optimization',
-          description: 'Optimize React applications for better performance',
-          duration: '32:15',
-          videoId: 'Cv_aHu9Iz-I',
-          completed: false,
-        },
-        {
-          id: 'react-304',
-          title: 'Testing React Apps',
-          description: 'Unit testing and integration testing',
-          duration: '26:40',
-          videoId: '1YrYDf4g2wU',
-          completed: false,
-        },
-        {
-          id: 'react-305',
-          title: 'React Router',
-          description: 'Client-side routing with React Router',
-          duration: '21:55',
-          videoId: 'Ul3y1Lkx8Wk',
-          completed: false,
-        },
-      ],
-    },
-  ],
-}
-
 export default function CoursePlayerPage() {
   const { skill } = useParams()
   const navigate = useNavigate()
-  
+  const [courseData, setCourseData] = useState(null)
+  const [progress, setProgress] = useState(null)
   const [activeVideo, setActiveVideo] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
+  // Load course data and progress
   useEffect(() => {
-    // Set the first video as active on component mount
-    const firstLesson = courseData.modules[0]?.lessons[0]
-    if (firstLesson) {
-      setActiveVideo(firstLesson)
+    async function loadCourse() {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Get course data
+        const course = await coursesAPI.getBySlug(skill)
+        setCourseData(course)
+        
+        // Get user progress if course exists
+        if (course?.id) {
+          try {
+            const userProgress = await coursesAPI.getProgress(course.id)
+            setProgress(userProgress)
+            
+            // Set active video to next uncompleted video or first video
+            const nextVideo = userProgress.nextVideo
+            if (nextVideo) {
+              setActiveVideo(nextVideo)
+            } else if (course.modules?.[0]?.videos?.[0]) {
+              setActiveVideo(course.modules[0].videos[0])
+            }
+          } catch (progressError) {
+            console.warn('Could not load progress:', progressError)
+            // Set first video as active if no progress
+            if (course.modules?.[0]?.videos?.[0]) {
+              setActiveVideo(course.modules[0].videos[0])
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load course:', err)
+        setError(err.message || 'Failed to load course')
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [])
+    
+    if (skill) {
+      loadCourse()
+    }
+  }, [skill])
 
-  const handleLessonClick = (lesson) => {
-    setActiveVideo(lesson)
+  // Handle video selection
+  const handleVideoSelect = async (video) => {
+    setActiveVideo(video)
     setIsSidebarOpen(false) // Close sidebar on mobile after selection
     setIsPlaying(true)
+    
+    // Update last accessed video
+    if (courseData?.id && video?.youtubeId) {
+      try {
+        await coursesAPI.updateLastAccessed(courseData.id, video.youtubeId)
+      } catch (err) {
+        console.warn('Could not update last accessed:', err)
+      }
+    }
   }
 
-  const completedLessons = courseData.modules.reduce(
-    (total, module) => total + module.lessons.filter(lesson => lesson.completed).length,
-    0
-  )
+  // Handle video completion (90% watched)
+  const handleVideoProgress = async (videoId, currentTime, duration) => {
+    if (!courseData?.id) return
+    
+    const watchedPercentage = (currentTime / duration) * 100
+    
+    if (watchedPercentage > 90) {
+      try {
+        await coursesAPI.updateProgress(
+          courseData.id,
+          videoId,
+          Math.round(currentTime / 60)
+        )
+        
+        // Refresh progress
+        const updatedProgress = await coursesAPI.getProgress(courseData.id)
+        setProgress(updatedProgress)
+      } catch (err) {
+        console.warn('Could not update progress:', err)
+      }
+    }
+  }
 
-  const progressPercentage = (completedLessons / courseData.totalLessons) * 100
+  // Check if video is completed
+  const isVideoCompleted = (videoId) => {
+    return progress?.completedVideos?.some(cv => cv.youtubeId === videoId) || false
+  }
+
+  // Calculate completion percentage
+  const completionPercentage = progress?.completionPercentage || 0
+  const completedCount = progress?.completedCount || 0
+  const totalVideos = progress?.totalVideos || courseData?.totalVideos || 0
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p>Loading course...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !courseData) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white text-center">
+          <h2 className="text-2xl font-bold mb-4">Course Not Found</h2>
+          <p className="text-slate-400 mb-6">{error || 'The requested course could not be found.'}</p>
+          <Button onClick={() => navigate('/skills')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Skills
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const [isPlaying, setIsPlaying] = useState(false)
 
   return (
     <div className="min-h-screen bg-slate-900 text-white">
@@ -232,7 +201,7 @@ export default function CoursePlayerPage() {
           <div className="aspect-video bg-black relative">
             {activeVideo && (
               <iframe
-                src={`https://www.youtube.com/embed/${activeVideo.videoId}?autoplay=1&rel=0`}
+                src={`https://www.youtube.com/embed/${activeVideo.youtubeId}?autoplay=1&rel=0`}
                 title={activeVideo.title}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -256,11 +225,11 @@ export default function CoursePlayerPage() {
                 </div>
                 <div className="flex items-center gap-2 text-slate-400">
                   <BookOpen className="h-4 w-4" />
-                  <span>{courseData.totalLessons} lessons</span>
+                  <span>{courseData.totalVideos} videos</span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-400">
                   <Users className="h-4 w-4" />
-                  <span>{courseData.students.toLocaleString()} students</span>
+                  <span>{courseData.studentsEnrolled?.toLocaleString() || 0} students</span>
                 </div>
               </div>
               
@@ -273,8 +242,8 @@ export default function CoursePlayerPage() {
                   ))}
                   <span className="text-slate-400 ml-2">{courseData.rating}</span>
                 </div>
-                <span className="text-slate-400 text-sm">Instructor: {courseData.instructor}</span>
-                <span className="text-slate-400 text-sm">Updated: {courseData.lastUpdated}</span>
+                <span className="text-slate-400 text-sm">Instructor: {courseData.instructor?.name || 'Unknown'}</span>
+                <span className="text-slate-400 text-sm">Updated: {new Date(courseData.lastUpdated).toLocaleDateString()}</span>
               </div>
             </div>
 
@@ -438,32 +407,32 @@ export default function CoursePlayerPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-white">Course Progress</h3>
                 <span className="text-sm text-slate-400">
-                  {completedLessons} of {courseData.totalLessons}
+                  {completedCount} of {totalVideos}
                 </span>
               </div>
-              <Progress value={progressPercentage} className="h-2 mb-2" />
-              <p className="text-xs text-slate-400">{Math.round(progressPercentage)}% complete</p>
+              <Progress value={completionPercentage} className="h-2 mb-2" />
+              <p className="text-xs text-slate-400">{Math.round(completionPercentage)}% complete</p>
             </div>
 
             {/* Scrollable Syllabus */}
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-6">
                 {courseData.modules.map((module) => (
-                  <div key={module.id}>
+                  <div key={module.moduleTitle}>
                     <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
                       <BookOpen className="h-4 w-4 text-blue-400" />
-                      {module.title}
+                      {module.moduleTitle}
                     </h4>
                     <p className="text-sm text-slate-400 mb-3">{module.description}</p>
                     
                     <div className="space-y-2">
-                      {module.lessons.map((lesson) => (
+                      {module.videos.map((video) => (
                         <button
-                          key={lesson.id}
-                          onClick={() => handleLessonClick(lesson)}
+                          key={video.youtubeId}
+                          onClick={() => handleVideoSelect(video)}
                           className={`
                             w-full text-left p-3 rounded-lg transition-all duration-200
-                            ${activeVideo?.id === lesson.id 
+                            ${activeVideo?.youtubeId === video.youtubeId 
                               ? 'bg-blue-600 text-white' 
                               : 'bg-slate-700/50 hover:bg-slate-700 text-slate-300'
                             }
@@ -471,22 +440,22 @@ export default function CoursePlayerPage() {
                         >
                           <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 mt-1">
-                              {lesson.completed ? (
+                              {isVideoCompleted(video.youtubeId) ? (
                                 <CheckCircle2 className="h-4 w-4 text-green-400" />
-                              ) : activeVideo?.id === lesson.id ? (
+                              ) : activeVideo?.youtubeId === video.youtubeId ? (
                                 <PlayCircle className="h-4 w-4 text-white" />
                               ) : (
                                 <Play className="h-4 w-4 text-slate-400" />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm line-clamp-2">{lesson.title}</p>
+                              <p className="font-medium text-sm line-clamp-2">{video.title}</p>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs opacity-75">
                                   <Clock className="h-3 w-3 inline mr-1" />
-                                  {lesson.duration}
+                                  {video.duration}
                                 </span>
-                                {lesson.completed && (
+                                {isVideoCompleted(video.youtubeId) && (
                                   <span className="text-xs bg-green-600 px-2 py-1 rounded">Done</span>
                                 )}
                               </div>

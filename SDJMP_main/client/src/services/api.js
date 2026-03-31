@@ -54,7 +54,7 @@ function normalizeJob(job) {
               : ''
           ),
         }
-      : rawSalary
+      : String(rawSalary || '').trim()
 
   const skills = [...(sourceJob.skills || []), ...(sourceJob.skillRequirements || [])]
     .map(normalizeSkillName)
@@ -62,15 +62,20 @@ function normalizeJob(job) {
   const uniqueSkills = [...new Set(skills)]
 
   return {
-    ...job,
-    ...sourceJob,
-    id: String(sourceJob.id || sourceJob._id || job.id || job._id || ''),
-    company: sourceJob.company || sourceJob.companyName || job.company || job.companyName || 'Unknown Company',
-    companyName: sourceJob.companyName || sourceJob.company || job.companyName || job.company || 'Unknown Company',
-    location: sourceJob.location || sourceJob.locationType || job.location || 'Remote',
+    id: sourceJob.id || job.id,
+    title: sourceJob.title || job.title || '',
+    description: sourceJob.description || job.description || '',
+    company: sourceJob.company || job.company || '',
+    location: sourceJob.location || job.location || '',
+    type: sourceJob.type || job.type || '',
     salary,
     skills: uniqueSkills,
-    matchScore: Number(job.matchScore) || 0,
+    requirements: Array.isArray(sourceJob.requirements) ? sourceJob.requirements : [],
+    benefits: Array.isArray(sourceJob.benefits) ? sourceJob.benefits : [],
+    postedAt: sourceJob.postedAt || job.postedAt || new Date().toISOString(),
+    deadline: sourceJob.deadline || job.deadline || '',
+    status: sourceJob.status || job.status || 'active',
+    employer: sourceJob.employer || job.employer || {},
   }
 }
 
@@ -79,40 +84,120 @@ function normalizeApplication(application) {
     return null
   }
 
-  const job = normalizeJob(application.job || application.jobId || {})
+  const sourceApp = application.application || application
 
   return {
-    ...application,
-    id: String(application.id || application._id || ''),
-    jobId:
-      typeof application.jobId === 'string'
-        ? application.jobId
-        : String(application.jobId?.id || application.jobId?._id || job?.id || ''),
-    job,
-    position: application.position || job?.title || 'Unknown Role',
-    company: application.company || job?.company || 'Unknown Company',
-    location: application.location || job?.location || 'Remote',
-    appliedDate: application.appliedDate || application.createdAt || null,
-    status: application.status || 'pending',
+    id: sourceApp.id || application.id,
+    jobId: sourceApp.jobId || application.jobId,
+    job: normalizeJob(sourceApp.job || application.job),
+    applicant: sourceApp.applicant || application.applicant || {},
+    status: sourceApp.status || application.status || 'pending',
+    appliedAt: sourceApp.appliedAt || application.appliedAt || new Date().toISOString(),
+    coverLetter: sourceApp.coverLetter || application.coverLetter || '',
+    resume: sourceApp.resume || application.resume || {},
+    notes: sourceApp.notes || application.notes || '',
   }
 }
 
-function normalizeResume(resume) {
-  if (!resume) {
+function normalizeAssessment(assessment) {
+  if (!assessment) {
+    return null
+  }
+
+  const sourceAssessment = assessment.assessment || assessment
+
+  return {
+    id: sourceAssessment.id || assessment.id,
+    title: sourceAssessment.title || assessment.title || '',
+    description: sourceAssessment.description || assessment.description || '',
+    type: sourceAssessment.type || assessment.type || 'skill',
+    questions: Array.isArray(sourceAssessment.questions) ? sourceAssessment.questions : [],
+    duration: sourceAssessment.duration || assessment.duration || 30,
+    difficulty: sourceAssessment.difficulty || assessment.difficulty || 'medium',
+    skills: Array.isArray(sourceAssessment.skills) ? sourceAssessment.skills : [],
+    passingScore: sourceAssessment.passingScore || assessment.passingScore || 70,
+    createdAt: sourceAssessment.createdAt || assessment.createdAt || new Date().toISOString(),
+    isActive: sourceAssessment.isActive !== undefined ? sourceAssessment.isActive : (assessment.isActive !== undefined ? assessment.isActive : true),
+  }
+}
+
+function normalizeSkill(skill) {
+  if (!skill) {
+    return null
+  }
+
+  const sourceSkill = skill.skill || skill
+
+  return {
+    id: sourceSkill.id || skill.id,
+    name: normalizeSkillName(sourceSkill.name || skill.name || ''),
+    category: sourceSkill.category || skill.category || '',
+    description: sourceSkill.description || skill.description || '',
+    level: sourceSkill.level || skill.level || '',
+    demand: sourceSkill.demand || skill.demand || 'medium',
+    growth: sourceSkill.growth || skill.growth || 'stable',
+    avgSalary: sourceSkill.avgSalary || skill.avgSalary || '',
+    learningResources: Array.isArray(sourceSkill.learningResources) ? sourceSkill.learningResources : [],
+    relatedJobs: Array.isArray(sourceSkill.relatedJobs) ? sourceSkill.relatedJobs : [],
+    prerequisites: Array.isArray(sourceSkill.prerequisites) ? sourceSkill.prerequisites : [],
+    certifications: Array.isArray(sourceSkill.certifications) ? sourceSkill.certifications : [],
+  }
+}
+
+function normalizeCourse(course) {
+  if (!course) {
     return null
   }
 
   return {
-    ...resume,
-    _id: String(resume._id || resume.id || ''),
-    id: String(resume.id || resume._id || ''),
-    name: resume.name || 'Untitled Resume',
-    type: resume.type || 'uploaded',
-    fileUrl: resume.fileUrl || '',
-    filePublicId: resume.filePublicId || '',
-    status: resume.status || 'pending',
-    isPrimary: Boolean(resume.isPrimary),
-    data: resume.data || null,
+    id: course._id || course.id,
+    title: course.title || '',
+    slug: course.slug || '',
+    description: course.description || '',
+    instructor: course.instructor || {},
+    level: course.level || '',
+    category: course.category || '',
+    duration: course.duration || '',
+    rating: course.rating || 0,
+    studentsEnrolled: course.studentsEnrolled || 0,
+    modules: Array.isArray(course.modules) ? course.modules.map(module => ({
+      moduleTitle: module.moduleTitle || '',
+      description: module.description || '',
+      videos: Array.isArray(module.videos) ? module.videos.map(video => ({
+        title: video.title || '',
+        youtubeId: video.youtubeId || '',
+        duration: video.duration || '',
+        description: video.description || '',
+        order: video.order || 0
+      })) : [],
+      order: module.order || 0
+    })) : [],
+    totalVideos: course.totalVideos || 0,
+    lastUpdated: course.lastUpdated || new Date().toISOString(),
+    isActive: course.isActive !== undefined ? course.isActive : true
+  }
+}
+
+function normalizeUserProgress(progress) {
+  if (!progress) {
+    return null
+  }
+
+  return {
+    courseId: progress.courseId || '',
+    completedVideos: Array.isArray(progress.completedVideos) ? progress.completedVideos : [],
+    completedCount: progress.completedCount || 0,
+    totalVideos: progress.totalVideos || 0,
+    completionPercentage: progress.completionPercentage || 0,
+    isCompleted: progress.isCompleted || false,
+    lastAccessed: progress.lastAccessed || new Date().toISOString(),
+    lastAccessedVideo: progress.lastAccessedVideo || {},
+    timeSpent: progress.timeSpent || 0,
+    notes: Array.isArray(progress.notes) ? progress.notes : [],
+    currentModule: progress.currentModule || '',
+    currentVideoIndex: progress.currentVideoIndex || 0,
+    nextVideo: progress.nextVideo || null,
+    courseStats: progress.courseStats || {}
   }
 }
 
@@ -377,6 +462,33 @@ export const notificationsAPI = {
     }),
 }
 
+export const coursesAPI = {
+  getAll: async (params = {}) => {
+    const payload = await apiRequest(`/courses${buildQueryString(params)}`)
+    return {
+      courses: (Array.isArray(payload?.courses) ? payload.courses : []).map(normalizeCourse).filter(Boolean),
+      pagination: payload?.pagination || {}
+    }
+  },
+  getBySlug: async (slug) => normalizeCourse(await apiRequest(`/courses/${slug}`)),
+  getProgress: async (courseId) => normalizeUserProgress(await apiRequest(`/courses/progress/${courseId}`)),
+  updateProgress: (courseId, videoId, timeSpent) =>
+    apiRequest('/courses/progress/update', {
+      method: 'patch',
+      body: { courseId, videoId, timeSpent }
+    }),
+  updateLastAccessed: (courseId, videoId) =>
+    apiRequest('/courses/progress/last-accessed', {
+      method: 'patch',
+      body: { courseId, videoId }
+    }),
+  addNote: (courseId, videoId, content, timestamp) =>
+    apiRequest(`/courses/progress/${courseId}/notes`, {
+      method: 'post',
+      body: { videoId, content, timestamp }
+    })
+}
+
 export const dashboardAPI = {
   getStats: () => apiRequest('/student/dashboard/stats'),
   getChartData: () => apiRequest('/student/dashboard/chart-data'),
@@ -390,6 +502,7 @@ export default {
   applications: applicationsAPI,
   skills: skillsAPI,
   assessments: assessmentsAPI,
+  courses: coursesAPI,
   employer: employerAPI,
   admin: adminAPI,
   notifications: notificationsAPI,
