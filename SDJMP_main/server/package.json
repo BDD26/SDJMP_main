@@ -5,10 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
-    "seed": "node seed.js",
-    "seed:courses": "node seed.js",
-    "seed:skills": "node seed.js"
+    "start": "node src/server.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

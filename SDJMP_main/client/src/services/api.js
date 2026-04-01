@@ -121,9 +121,11 @@ function normalizeJob(job) {
 
   return {
     id: sourceJob.id || job.id,
+    _id: sourceJob._id || job._id,
     title: sourceJob.title || job.title || '',
     description: sourceJob.description || job.description || '',
     company: sourceJob.company || job.company || '',
+    companyName: sourceJob.companyName || job.companyName || '',
     location: sourceJob.location || job.location || '',
     type: sourceJob.type || job.type || '',
     salary,
@@ -134,6 +136,7 @@ function normalizeJob(job) {
     deadline: sourceJob.deadline || job.deadline || '',
     status: sourceJob.status || job.status || 'active',
     employer: sourceJob.employer || job.employer || {},
+    matchScore: Number(sourceJob.matchScore ?? job.matchScore ?? 0) || 0,
   }
 }
 

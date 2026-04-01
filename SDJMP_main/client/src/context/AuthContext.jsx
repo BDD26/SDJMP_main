@@ -1,13 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  clearDevSession,
-  createDevUserRegistration,
-  getDevCredentialsByEmail,
-  isDevAuthEnabled,
-  readDevSession,
-  writeDevSession,
-} from '@/features/auth/dev-auth'
 import { normalizeSessionUser } from '@/features/auth/schemas'
 import { authAPI, userAPI } from '@/services/api'
 import { normalizeApiError } from '@/shared/api/api-error'
@@ -27,10 +19,6 @@ export function AuthProvider({ children }) {
       } catch (queryError) {
         if (queryError?.status === 401) {
           return null
-        }
-
-        if (isDevAuthEnabled()) {
-          return readDevSession()
         }
 
         throw queryError
@@ -113,47 +101,25 @@ export function AuthProvider({ children }) {
       const authenticatedUser = await loginMutation.mutateAsync({ email, password })
       return { success: true, user: authenticatedUser }
     } catch (mutationError) {
-      if (isDevAuthEnabled()) {
-        const credential = getDevCredentialsByEmail(email)
-
-        if (credential && credential.password === password) {
-          writeDevSession(credential.user)
-          queryClient.setQueryData(SESSION_QUERY_KEY, credential.user)
-          setError(null)
-          return { success: true, user: credential.user, isDevFallback: true }
-        }
-      }
-
       return { success: false, error: normalizeApiError(mutationError).message }
     }
-  }, [loginMutation, queryClient])
+  }, [loginMutation])
 
   const register = useCallback(async (userData) => {
     try {
       const registeredUser = await registerMutation.mutateAsync(userData)
       return { success: true, user: registeredUser }
     } catch (mutationError) {
-      if (isDevAuthEnabled()) {
-        const fallbackUser = createDevUserRegistration(userData)
-        writeDevSession(fallbackUser)
-        queryClient.setQueryData(SESSION_QUERY_KEY, fallbackUser)
-        setError(null)
-        return { success: true, user: fallbackUser, isDevFallback: true }
-      }
-
       return { success: false, error: normalizeApiError(mutationError).message }
     }
-  }, [queryClient, registerMutation])
+  }, [registerMutation])
 
   const logout = useCallback(async () => {
     try {
       await authAPI.logout()
     } catch {
-      if (!isDevAuthEnabled()) {
-        throw new Error('Logout failed')
-      }
+      // ignore logout errors
     } finally {
-      clearDevSession()
       queryClient.setQueryData(SESSION_QUERY_KEY, null)
       queryClient.removeQueries({ queryKey: ['notifications'] })
     }
@@ -172,22 +138,6 @@ export function AuthProvider({ children }) {
 
       return { success: true, user: updatedUser ?? user }
     } catch (mutationError) {
-      if (isDevAuthEnabled() && user) {
-        const fallbackUser = {
-          ...user,
-          ...profileData,
-          profile: {
-            ...(user.profile || {}),
-            ...(profileData.profile || profileData),
-          },
-        }
-
-        writeDevSession(fallbackUser)
-        queryClient.setQueryData(SESSION_QUERY_KEY, fallbackUser)
-        setError(null)
-        return { success: true, user: fallbackUser, isDevFallback: true }
-      }
-
       return { success: false, error: normalizeApiError(mutationError).message }
     }
   }, [queryClient, updateProfileMutation, user])
@@ -197,11 +147,6 @@ export function AuthProvider({ children }) {
       await forgotPasswordMutation.mutateAsync(email)
       return { success: true }
     } catch (mutationError) {
-      if (isDevAuthEnabled()) {
-        setError(null)
-        return { success: true, isDevFallback: true }
-      }
-
       return { success: false, error: normalizeApiError(mutationError).message }
     }
   }, [forgotPasswordMutation])
@@ -211,11 +156,6 @@ export function AuthProvider({ children }) {
       await resetPasswordMutation.mutateAsync({ token, password })
       return { success: true }
     } catch (mutationError) {
-      if (isDevAuthEnabled()) {
-        setError(null)
-        return { success: true, isDevFallback: true }
-      }
-
       return { success: false, error: normalizeApiError(mutationError).message }
     }
   }, [resetPasswordMutation])

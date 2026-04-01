@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react"
 
 const ThemeProviderContext = createContext()
+const supportedThemes = new Set(["light", "dark", "system"])
 
 export function ThemeProvider({
   children,
@@ -8,21 +9,18 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }) {
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem(storageKey) || defaultTheme
-  )
-  const [isHighContrast, setIsHighContrast] = useState(
-    () => localStorage.getItem("high-contrast") === "true"
-  )
+  const [theme, setTheme] = useState(() => {
+    const storedTheme = localStorage.getItem(storageKey)
+    return supportedThemes.has(storedTheme) ? storedTheme : defaultTheme
+  })
 
   useEffect(() => {
     const root = window.document.documentElement
 
     root.classList.remove("light", "dark", "high-contrast")
+    localStorage.removeItem("high-contrast")
 
-    if (isHighContrast) {
-      root.classList.add("high-contrast")
-    } else if (theme === "system") {
+    if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
         .matches
         ? "dark"
@@ -31,20 +29,15 @@ export function ThemeProvider({
     } else {
       root.classList.add(theme)
     }
-  }, [theme, isHighContrast])
+  }, [theme])
 
   const value = {
     theme,
     setTheme: (theme) => {
-      localStorage.setItem(storageKey, theme)
-      setTheme(theme)
+      const nextTheme = supportedThemes.has(theme) ? theme : defaultTheme
+      localStorage.setItem(storageKey, nextTheme)
+      setTheme(nextTheme)
     },
-    isHighContrast,
-    toggleHighContrast: () => {
-      const newVal = !isHighContrast
-      localStorage.setItem("high-contrast", newVal.toString())
-      setIsHighContrast(newVal)
-    }
   }
 
   return (

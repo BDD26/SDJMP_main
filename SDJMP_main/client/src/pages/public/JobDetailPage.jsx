@@ -155,8 +155,26 @@ export default function JobDetailPage() {
       try {
         setLoading(true)
         const jobData = await api.jobs.getById(id)
+        let resolvedJob = jobData
+
+        if (user?.role === 'student') {
+          try {
+            const matches = await api.jobs.getStudentMatches()
+            const matchedJob = matches.find((entry) => String(entry.id || entry._id) === String(id))
+            if (matchedJob) {
+              resolvedJob = {
+                ...jobData,
+                ...matchedJob,
+                matchScore: matchedJob.matchScore,
+              }
+            }
+          } catch {
+            // Fall back to the base job payload if match lookup fails.
+          }
+        }
+
         if (isMounted) {
-          setJob(jobData)
+          setJob(resolvedJob)
         }
       } catch (error) {
         toast.error('Failed to load job details')
@@ -174,7 +192,7 @@ export default function JobDetailPage() {
     return () => {
       isMounted = false
     }
-  }, [id])
+  }, [id, user?.role])
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'student') {
@@ -238,7 +256,13 @@ export default function JobDetailPage() {
     }
   }, [id, isAuthenticated, user?.role])
 
-  const matchScore = useMemo(() => calculateMatch(job, user), [job, user])
+  const matchScore = useMemo(() => {
+    if (typeof job?.matchScore === 'number' && Number.isFinite(job.matchScore)) {
+      return job.matchScore
+    }
+
+    return calculateMatch(job, user)
+  }, [job, user])
   const matchBreakdown = useMemo(() => buildMatchBreakdown(job, user, matchScore), [job, user, matchScore])
   const normalizedRequirements = useMemo(
     () => {

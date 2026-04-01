@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/context/AuthContext'
-import { DEV_CREDENTIALS, isDevAuthEnabled } from '@/features/auth/dev-auth'
 import { getDashboardPath } from '@/app/roles'
 import { toast } from 'sonner'
 
@@ -20,7 +19,6 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const { login, loading } = useAuth()
   const navigate = useNavigate()
-  const showDevCredentials = isDevAuthEnabled()
 
   const {
     register,
@@ -119,22 +117,6 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            {showDevCredentials ? (
-              <div className="mt-6 rounded-xl border border-dashed bg-muted/40 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Temporary Dev Credentials
-                </p>
-                <div className="mt-3 space-y-2 text-sm">
-                  {DEV_CREDENTIALS.map((credential) => (
-                    <div key={credential.email} className="rounded-lg bg-background p-3">
-                      <p><span className="font-medium">Email:</span> {credential.email}</p>
-                      <p><span className="font-medium">Password:</span> {credential.password}</p>
-                      <p><span className="font-medium">Role:</span> {credential.user.role}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
       </div>

@@ -1,4 +1,4 @@
-import { Moon, Sun, ShieldCheck, Eye } from "lucide-react"
+import { Moon, Sun } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -6,18 +6,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { useTheme } from "@/components/theme-provider"
 
 export function ThemeToggle() {
-  const { setTheme, toggleHighContrast, isHighContrast } = useTheme()
+  const { setTheme } = useTheme()
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className={`hover-glow ${isHighContrast ? 'border-primary border-2 bg-primary/5' : ''}`}>
+        <Button variant="outline" size="icon" className="hover-glow">
           <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
           <span className="sr-only">Toggle theme</span>
@@ -36,15 +35,6 @@ export function ThemeToggle() {
         <DropdownMenuItem onClick={() => setTheme("system")} className="gap-2">
            <div className="h-4 w-4 flex items-center justify-center border rounded-full text-[8px] font-bold">OS</div>
            System Sync
-        </DropdownMenuItem>
-        
-        <DropdownMenuSeparator />
-        
-        <DropdownMenuLabel>Accessibility</DropdownMenuLabel>
-        <DropdownMenuItem onClick={toggleHighContrast} className="gap-2">
-          <Eye className={`h-4 w-4 ${isHighContrast ? 'text-primary' : ''}`} />
-          High Contrast Mode
-          {isHighContrast && <ShieldCheck className="h-3 w-3 ml-auto text-primary" />}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
