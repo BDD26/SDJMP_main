@@ -1,5 +1,6 @@
 import { normalizeSessionUser } from '@/features/auth/schemas'
 import { normalizeNotifications } from '@/features/notifications/schemas'
+import env from '@/shared/config/env'
 import { request } from '@/shared/api/http'
 
 function unwrapPayload(payload, key) {
@@ -28,6 +29,63 @@ function normalizeSkillName(skill) {
   }
 
   return ''
+}
+
+function resolveAssetUrl(fileUrl) {
+  const value = String(fileUrl || '').trim()
+  if (!value) {
+    return ''
+  }
+
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:') || value.startsWith('blob:')) {
+    return value
+  }
+
+  if (!value.startsWith('/')) {
+    return value
+  }
+
+  const apiBaseUrl = String(env.apiBaseUrl || '').trim()
+
+  if (/^https?:\/\//i.test(apiBaseUrl)) {
+    return `${apiBaseUrl.replace(/\/api\/?$/i, '')}${value}`
+  }
+
+  if (typeof window !== 'undefined') {
+    return new URL(value, window.location.origin).toString()
+  }
+
+  return value
+}
+
+function normalizeResume(resume) {
+  if (!resume) {
+    return null
+  }
+
+  const sourceResume = resume.resume && typeof resume.resume === 'object' ? resume.resume : resume
+  const rawId = sourceResume._id || sourceResume.id || resume._id || resume.id
+  const safeData =
+    sourceResume.data && typeof sourceResume.data === 'object' && !Array.isArray(sourceResume.data)
+      ? sourceResume.data
+      : null
+
+  return {
+    ...sourceResume,
+    id: rawId ? String(rawId) : '',
+    _id: rawId ? String(rawId) : '',
+    name: sourceResume.name || resume.name || 'Resume',
+    type: sourceResume.type || resume.type || 'uploaded',
+    fileUrl: resolveAssetUrl(sourceResume.fileUrl || resume.fileUrl || ''),
+    filePublicId: sourceResume.filePublicId || resume.filePublicId || '',
+    storageProvider: sourceResume.storageProvider || resume.storageProvider || 'none',
+    data: safeData,
+    atsScore: Number(sourceResume.atsScore ?? resume.atsScore ?? 0) || 0,
+    isPrimary: Boolean(sourceResume.isPrimary ?? resume.isPrimary),
+    status: sourceResume.status || resume.status || 'pending',
+    createdAt: sourceResume.createdAt || resume.createdAt || new Date().toISOString(),
+    updatedAt: sourceResume.updatedAt || resume.updatedAt || '',
+  }
 }
 
 function normalizeJob(job) {
@@ -368,17 +426,17 @@ export const applicationsAPI = {
 export const skillsAPI = {
   getAll: () => apiRequest('/skills'),
   getPopular: () => apiRequest('/skills/popular'),
-  addToProfile: (skillId, level) =>
+  addToProfile: (skill) =>
     apiRequest('/skills/user', {
       method: 'post',
-      body: { skillId, level },
+      body: skill,
     }),
-  updateLevel: (skillId, level) =>
-    apiRequest(`/skills/user/${skillId}`, {
+  updateLevel: (skillId, changes) =>
+    apiRequest(`/skills/user/${encodeURIComponent(skillId)}`, {
       method: 'put',
-      body: { level },
+      body: changes,
     }),
-  removeFromProfile: (skillId) => apiRequest(`/skills/user/${skillId}`, { method: 'delete' }),
+  removeFromProfile: (skillId) => apiRequest(`/skills/user/${encodeURIComponent(skillId)}`, { method: 'delete' }),
 }
 
 export const assessmentsAPI = {

@@ -578,8 +578,9 @@ export default function StudentResumeManager() {
       
       // Refresh Auth session so profile skills instantly show up without a page refresh
       if (typeof refreshSession === 'function') {
-        refreshSession()
+        await refreshSession()
       }
+      window.dispatchEvent(new CustomEvent('skillmatch:data-changed', { detail: { type: 'skill' } }))
     } catch (error) {
        toast.error(error?.message || 'Upload failed')
     } finally {
@@ -613,6 +614,10 @@ export default function StudentResumeManager() {
       })
       setShowBuilder(false)
       setBuilderStep(1)
+      if (typeof refreshSession === 'function') {
+        await refreshSession()
+      }
+      window.dispatchEvent(new CustomEvent('skillmatch:data-changed', { detail: { type: 'skill' } }))
       toast.success('Resume created successfully')
       fetchResumes()
     } catch (error) {
@@ -628,6 +633,10 @@ export default function StudentResumeManager() {
         setSelectedResume(null)
         setShowPreview(false)
       }
+      if (typeof refreshSession === 'function') {
+        await refreshSession()
+      }
+      window.dispatchEvent(new CustomEvent('skillmatch:data-changed', { detail: { type: 'skill' } }))
       toast.success('Resume deleted')
     } catch (error) {
       toast.error('Failed to delete')

@@ -23,6 +23,8 @@ import usersRouter from './modules/users/users.routes.js'
 import courseRoutes from './routes/course.routes.js';
 
 const app = express()
+app.set('trust proxy', 1)
+
 const localDevOrigins = [
   'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -31,14 +33,39 @@ const localDevOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
 ]
-const allowedOrigins = new Set([env.clientUrl, ...localDevOrigins])
+const allowedOrigins = new Set([...env.clientUrls, ...localDevOrigins])
+const tunnelOriginPatterns = [
+  /\.ngrok(?:-free)?\.app$/i,
+  /\.ngrok\.io$/i,
+  /\.loca\.lt$/i,
+  /\.localtunnel\.me$/i,
+  /\.trycloudflare\.com$/i,
+  /\.devtunnels\.ms$/i,
+]
+
+function isAllowedOrigin(origin) {
+  if (!origin || allowedOrigins.has(origin)) {
+    return true
+  }
+
+  if (env.isProduction) {
+    return false
+  }
+
+  try {
+    const parsedOrigin = new URL(origin)
+    return tunnelOriginPatterns.some((pattern) => pattern.test(parsedOrigin.hostname))
+  } catch {
+    return false
+  }
+}
 
 app.use(helmet())
 app.use(compression())
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true)
         return
       }

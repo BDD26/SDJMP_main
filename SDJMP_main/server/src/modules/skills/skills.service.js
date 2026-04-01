@@ -5,6 +5,8 @@ export function serializeSkill(skillDocument) {
     id: String(skill._id || skill.id),
     name: skill.name,
     category: skill.category,
+    categoryLabel: skill.categoryLabel || '',
+    categoryDescription: skill.categoryDescription || '',
     description: skill.description || '',
     popularity: skill.popularity || 0,
     demand: Math.max(0, Number(skill.demand) || 0),

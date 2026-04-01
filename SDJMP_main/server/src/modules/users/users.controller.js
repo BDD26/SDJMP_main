@@ -3,8 +3,14 @@ import Resume from './resume.model.js'
 import { createHttpError } from '../../utils/http-error.js'
 import { comparePassword, hashPassword, sanitizeUser } from '../auth/auth.service.js'
 import { destroyCloudinaryRawAsset } from '../../utils/cloudinary.js'
+import { deleteLocalResumeFile } from '../../utils/local-upload.js'
 import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
-import { mergeSkillsIntoUserProfile } from '../skills/skill-inventory.service.js'
+import {
+  collectNormalizedSkillNames,
+  mergeSkillsIntoUserProfile,
+  normalizeSkillSources,
+  removeSkillSourceFromUserProfile,
+} from '../skills/skill-inventory.service.js'
 import { createUserNotification } from '../notifications/notification-dispatch.service.js'
 
 function normalizeString(value) {
@@ -20,6 +26,77 @@ function normalizeStringArray(values = []) {
     .filter(Boolean)
 }
 
+function defaultManualSkillSource() {
+  return [{ type: 'manual', sourceId: '', category: 'manual' }]
+}
+
+function collectResumeSkillNames(resume = {}) {
+  const skillNames = new Set()
+  const resumeData = resume?.data && typeof resume.data === 'object' ? resume.data : {}
+
+  const register = (values) => {
+    collectNormalizedSkillNames(values).forEach((name) => skillNames.add(name))
+  }
+
+  register(resumeData.skills)
+  register(resumeData?.skillContributions?.builderSkillNames)
+  register(resumeData?.skillContributions?.addedSkillNames)
+  register(resumeData?.skillContributions?.allSkillNames)
+  register(resumeData?.parsing?.matchedSkillNames)
+  register(resumeData?.parsing?.addedSkillNames)
+
+  return skillNames
+}
+
+async function resolveResumeSkillNames(resume = {}) {
+  let skillNames = Array.from(collectResumeSkillNames(resume))
+
+  if (skillNames.length === 0 && resume?.fileUrl) {
+    try {
+      const { analyzeResumeSkills } = await import('./resume.service.js')
+      const analysis = await analyzeResumeSkills(
+        resume.fileUrl,
+        resume?.data?.mimeType || 'application/pdf'
+      )
+      skillNames = (analysis.matchedSkills || []).map((skill) => skill.name).filter(Boolean)
+    } catch (error) {
+      console.warn('Failed to analyze resume skills during delete fallback', error)
+    }
+  }
+
+  return skillNames
+}
+
+async function removeResumeLinkedSkills(userId, resume) {
+  const user = await User.findById(userId)
+  if (!user) {
+    return { changed: false, removedSkills: [] }
+  }
+
+  const remainingResumes = await Resume.find({
+    studentId: userId,
+    _id: { $ne: resume._id },
+  })
+    .select('data fileUrl type')
+    .lean()
+
+  const fallbackSkillNames = await resolveResumeSkillNames(resume)
+  const preserveFallbackSkillNameSet = new Set()
+  for (const remainingResume of remainingResumes) {
+    const remainingSkillNames = await resolveResumeSkillNames(remainingResume)
+    remainingSkillNames.forEach((skillName) => preserveFallbackSkillNameSet.add(skillName))
+  }
+
+  const preserveFallbackSkillNames = Array.from(preserveFallbackSkillNameSet)
+
+  return removeSkillSourceFromUserProfile(user, {
+    sourceType: 'resume',
+    sourceId: String(resume._id),
+    fallbackSkillNames,
+    preserveFallbackSkillNames,
+  })
+}
+
 function normalizeProfile(profile = {}) {
   return {
     bio: normalizeString(profile.bio),
@@ -31,6 +108,7 @@ function normalizeProfile(profile = {}) {
             level: skill?.level || 'intermediate',
             years: Number.isFinite(Number(skill?.years)) ? Number(skill.years) : 0,
             verified: Boolean(skill?.verified),
+            sources: normalizeSkillSources(skill?.sources || []),
           }))
           .filter((skill) => skill.name)
       : [],
@@ -96,17 +174,35 @@ export async function updateProfile(req, res) {
     let nextSkills = existingProfile.skills
     if (incomingProfile.skills !== undefined) {
       const incomingSkills = normalizeProfile({ skills: incomingProfile.skills }).skills
-      const existingVerifiedMap = new Map(
-        existingProfile.skills.map((skill) => [String(skill.name || '').toLowerCase(), Boolean(skill.verified)])
+      const existingSkillMap = new Map(
+        existingProfile.skills.map((skill) => [
+          String(skill.name || '').toLowerCase(),
+          {
+            verified: Boolean(skill.verified),
+            sources: normalizeSkillSources(skill.sources || []),
+          },
+        ])
       )
 
-      nextSkills = incomingSkills.map((skill) => ({
-        ...skill,
-        verified:
-          skill.verified !== undefined
-            ? Boolean(skill.verified)
-            : Boolean(existingVerifiedMap.get(String(skill.name || '').toLowerCase())),
-      }))
+      nextSkills = incomingSkills.map((skill, index) => {
+        const normalizedName = String(skill.name || '').toLowerCase()
+        const existingSkill = existingSkillMap.get(normalizedName)
+        const fallbackSkill = existingProfile.skills[index]
+        const preservedSources =
+          skill.sources.length > 0
+            ? skill.sources
+            : normalizeSkillSources(existingSkill?.sources || fallbackSkill?.sources || [])
+        const isNewSkill = !existingSkill && !fallbackSkill
+
+        return {
+          ...skill,
+          verified:
+            skill.verified !== undefined
+              ? Boolean(skill.verified)
+              : Boolean(existingSkill?.verified ?? fallbackSkill?.verified),
+          sources: preservedSources.length > 0 ? preservedSources : (isNewSkill ? defaultManualSkillSource() : []),
+        }
+      })
       shouldRefreshMatches = req.user.role === 'student'
     }
 
@@ -216,7 +312,15 @@ export async function createResume(req, res) {
   if (type === 'uploaded' && fileUrl) {
     try {
       const { processResumeForUser } = await import('./resume.service.js')
-      const parseResult = await processResumeForUser(req.user._id, fileUrl, data?.mimeType || 'application/pdf')
+      const parseResult = await processResumeForUser(
+        req.user._id,
+        fileUrl,
+        data?.mimeType || 'application/pdf',
+        {
+          resumeId: newResume._id,
+          sourceCategory: 'resume-parser',
+        }
+      )
 
       // Mark uploaded resumes as verified once they have been successfully parsed.
       if (parseResult?.parsed) {
@@ -229,6 +333,8 @@ export async function createResume(req, res) {
           textLength: parseResult.textLength || 0,
           matchedSkillsCount: parseResult.matchedSkillsCount || 0,
           addedSkillsCount: parseResult.addedSkillsCount || 0,
+          matchedSkillNames: (parseResult.matchedSkills || []).map((skill) => skill.name).filter(Boolean),
+          addedSkillNames: (parseResult.addedSkills || []).map((skill) => skill.name).filter(Boolean),
         }
         newResume.data = nextData
         newResume.markModified('data')
@@ -261,7 +367,24 @@ export async function createResume(req, res) {
           const { addedSkills } = await mergeSkillsIntoUserProfile(user, extractedSkills, {
             verified: false,
             category: 'resume-builder',
+            source: {
+              type: 'resume',
+              sourceId: String(newResume._id),
+              category: 'resume-builder',
+            },
           })
+
+          const nextData = (newResume.data && typeof newResume.data === 'object') ? { ...newResume.data } : {}
+          nextData.skillContributions = {
+            ...(nextData.skillContributions && typeof nextData.skillContributions === 'object'
+              ? nextData.skillContributions
+              : {}),
+            builderSkillNames: extractedSkills.map((skill) => skill.name).filter(Boolean),
+            addedSkillNames: addedSkills.map((skill) => skill.name).filter(Boolean),
+          }
+          newResume.data = nextData
+          newResume.markModified('data')
+          await newResume.save()
 
           if (addedSkills.length > 0) {
             await createUserNotification({
@@ -293,7 +416,10 @@ export async function createResume(req, res) {
     if (fileUrl) {
       try {
         const { processResumeForUser } = await import('./resume.service.js')
-        const parseResult = await processResumeForUser(req.user._id, fileUrl, 'application/pdf')
+        const parseResult = await processResumeForUser(req.user._id, fileUrl, 'application/pdf', {
+          resumeId: newResume._id,
+          sourceCategory: 'resume-parser',
+        })
         if (parseResult?.parsed) {
           const nextData = (newResume.data && typeof newResume.data === 'object') ? { ...newResume.data } : {}
           nextData.parsing = {
@@ -301,6 +427,8 @@ export async function createResume(req, res) {
             textLength: parseResult.textLength || 0,
             matchedSkillsCount: parseResult.matchedSkillsCount || 0,
             addedSkillsCount: parseResult.addedSkillsCount || 0,
+            matchedSkillNames: (parseResult.matchedSkills || []).map((skill) => skill.name).filter(Boolean),
+            addedSkillNames: (parseResult.addedSkills || []).map((skill) => skill.name).filter(Boolean),
           }
           newResume.data = nextData
           newResume.markModified('data')
@@ -340,6 +468,18 @@ export async function deleteResume(req, res) {
   const resume = await Resume.findOneAndDelete({ _id: id, studentId: req.user._id })
   if (!resume) throw createHttpError(404, 'Resume not found')
 
+  let removedSkills = []
+  try {
+    const cleanupResult = await removeResumeLinkedSkills(req.user._id, resume)
+    removedSkills = cleanupResult.removedSkills || []
+
+    if (cleanupResult.changed) {
+      await notifyStudentForAllPublishedJobs(req.user._id)
+    }
+  } catch (error) {
+    console.warn('Failed to remove resume-linked skills after resume deletion', error)
+  }
+
   if (resume.filePublicId && resume.storageProvider === 'cloudinary') {
     try {
       await destroyCloudinaryRawAsset(resume.filePublicId)
@@ -364,5 +504,8 @@ export async function deleteResume(req, res) {
     }
   }
 
-  res.status(200).json({ message: 'Resume deleted successfully' })
+  res.status(200).json({
+    message: 'Resume deleted successfully',
+    removedSkills,
+  })
 }

@@ -4,24 +4,8 @@ import { mergeSkillsIntoUserProfile, normalizeSkillPayload } from './skill-inven
 import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
 import Skill from './skill.model.js'
 import { serializeSkill } from './skills.service.js'
-import { defaultSkillLibrary } from './default-skill-library.js'
-
-async function ensureDefaultSkillLibrary() {
-  await Skill.bulkWrite(
-    defaultSkillLibrary.map((skill) => ({
-      updateOne: {
-        filter: { name: skill.name },
-        update: { $setOnInsert: skill },
-        upsert: true,
-      },
-    })),
-    { ordered: false }
-  )
-}
 
 export async function getAllSkills(req, res) {
-  await ensureDefaultSkillLibrary()
-
   const skills = await Skill.find({})
     .sort({ category: 1, name: 1 })
     .lean()
@@ -30,8 +14,6 @@ export async function getAllSkills(req, res) {
 }
 
 export async function getPopularSkills(req, res) {
-  await ensureDefaultSkillLibrary()
-
   const skills = await Skill.find({})
     .sort({ growth: -1, demand: -1, popularity: -1, name: 1 })
     .limit(12)
@@ -61,7 +43,12 @@ export async function addSkillToProfile(req, res) {
 
   const skill = normalizeSkillPayload(req.body, { verified: false })
   const result = await mergeSkillsIntoUserProfile(user, [skill], {
-    category: req.body.category || 'manual',
+    category: 'manual',
+    source: {
+      type: 'manual',
+      sourceId: '',
+      category: 'manual',
+    },
     verified: false,
   })
 
@@ -94,26 +81,17 @@ export async function updateSkillLevel(req, res) {
     throw createHttpError(404, 'Skill not found in user profile')
   }
 
-  const result = await mergeSkillsIntoUserProfile(
-    user,
-    [
-      {
-        name: currentSkill.name,
-        level: req.body.level || currentSkill.level,
-        years: req.body.years ?? currentSkill.years,
-        verified: req.body.verified ?? currentSkill.verified,
-      },
-    ],
-    {
-      category: 'manual',
-    }
-  )
+  currentSkill.level = req.body.level || currentSkill.level
+  currentSkill.years = Math.max(0, Number(req.body.years ?? currentSkill.years ?? 0))
+  currentSkill.verified = Boolean(req.body.verified ?? currentSkill.verified)
+  user.markModified('profile.skills')
+  await user.save()
 
   await notifyStudentForAllPublishedJobs(user._id)
 
   res.status(200).json({
     message: 'Skill updated',
-    updatedSkills: result.updatedSkills,
+    updatedSkills: [currentSkill],
     skills: user.profile.skills,
   })
 }
@@ -140,6 +118,7 @@ export async function removeSkillFromProfile(req, res) {
   user.profile.skills = nextSkills
   user.markModified('profile.skills')
   await user.save()
+  await notifyStudentForAllPublishedJobs(user._id)
 
   res.status(200).json({
     message: 'Skill removed from profile',

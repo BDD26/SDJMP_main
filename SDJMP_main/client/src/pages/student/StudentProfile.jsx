@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import api from '@/services/api'
 import { buildStudentProfileViewData, calculateProfileCompletion, transformProfileForBackend } from '@/utils/profileTransforms'
 
 const JOB_TYPE_OPTIONS = ['Full-time', 'Internship', 'Contract', 'Remote Role']
@@ -28,7 +29,7 @@ function SectionEmpty({ children, fullWidth = false }) {
 }
 
 export default function StudentProfile() {
-  const { user, updateProfile } = useAuth()
+  const { user, updateProfile, refreshSession } = useAuth()
   const [profileData, setProfileData] = useState(() => getEmptyState(user))
   const [profileCompletion, setProfileCompletion] = useState(0)
   const [activeModal, setActiveModal] = useState(null)
@@ -95,6 +96,26 @@ export default function StudentProfile() {
     return savedProfile
   }
 
+  const emitSkillChange = () => {
+    window.dispatchEvent(new CustomEvent('skillmatch:data-changed', { detail: { type: 'skill' } }))
+  }
+
+  const refreshProfileFromSession = async () => {
+    if (typeof refreshSession !== 'function') {
+      return false
+    }
+
+    const result = await refreshSession()
+    if (result?.data) {
+      const nextProfile = getEmptyState(result.data)
+      setProfileData(nextProfile)
+      setProfileCompletion(calculateProfileCompletion(nextProfile))
+      return true
+    }
+
+    return false
+  }
+
   const handleSave = async () => {
     setIsLoading(true)
     try {
@@ -104,7 +125,17 @@ export default function StudentProfile() {
         nextProfile.bio = formValues.bio || ''
         nextProfile.location = formValues.location || ''
       } else if (activeModal === 'skills') {
-        const skill = { name: formValues.name || 'New Skill', level: formValues.level || 'intermediate', years: Number(formValues.years) || 0 }
+        const existingSkill = editingIndex !== null ? nextProfile.skills[editingIndex] : null
+        const skill = {
+          ...(existingSkill || {}),
+          name: formValues.name || 'New Skill',
+          level: formValues.level || existingSkill?.level || 'intermediate',
+          years: Number(formValues.years) || 0,
+          verified: Boolean(existingSkill?.verified),
+          sources: Array.isArray(existingSkill?.sources) && existingSkill.sources.length > 0
+            ? existingSkill.sources
+            : [{ type: 'manual', sourceId: '', category: 'manual' }],
+        }
         nextProfile.skills = editingIndex !== null ? nextProfile.skills.map((item, index) => index === editingIndex ? skill : item) : [...nextProfile.skills, skill]
       } else if (activeModal === 'education') {
         const education = { id: profileData.education[editingIndex]?.id || `edu-${Date.now()}`, degree: formValues.degree, institution: formValues.institution, year: String(formValues.year || '') }
@@ -124,6 +155,9 @@ export default function StudentProfile() {
       }
 
       await persistProfile(nextProfile)
+      if (activeModal === 'skills') {
+        emitSkillChange()
+      }
       toast.success('Profile updated successfully')
       closeModal()
     } catch (error) {
@@ -152,6 +186,28 @@ export default function StudentProfile() {
       toast.success('Certification removed')
     } catch (error) {
       toast.error(error?.message || 'Failed to remove certification')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleRemoveSkill = async (skillName) => {
+    setIsLoading(true)
+    try {
+      await api.skills.removeFromProfile(skillName)
+      const refreshed = await refreshProfileFromSession()
+      if (!refreshed) {
+        setProfileData((currentProfile) => ({
+          ...currentProfile,
+          skills: currentProfile.skills.filter(
+            (skill) => String(skill?.name || '').toLowerCase() !== String(skillName || '').toLowerCase()
+          ),
+        }))
+      }
+      emitSkillChange()
+      toast.success('Skill removed')
+    } catch (error) {
+      toast.error(error?.message || 'Failed to remove skill')
     } finally {
       setIsLoading(false)
     }
@@ -292,24 +348,36 @@ export default function StudentProfile() {
                           Experience: {skill.years} {skill.years === 1 ? 'Year' : 'Years'}
                         </p>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                        onClick={() => {
-                          const idx = profileData.skills.findIndex(
-                            (s) =>
-                              s?.name === skill?.name &&
-                              s?.level === skill?.level &&
-                              Number(s?.years) === Number(skill?.years)
-                          )
-                          openModal('skills', skill, idx >= 0 ? idx : null)
-                        }}
-                        aria-label={`Edit ${skill.name}`}
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            const idx = profileData.skills.findIndex(
+                              (s) =>
+                                s?.name === skill?.name &&
+                                s?.level === skill?.level &&
+                                Number(s?.years) === Number(skill?.years)
+                            )
+                            openModal('skills', skill, idx >= 0 ? idx : null)
+                          }}
+                          aria-label={`Edit ${skill.name}`}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleRemoveSkill(skill.name)}
+                          aria-label={`Delete ${skill.name}`}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

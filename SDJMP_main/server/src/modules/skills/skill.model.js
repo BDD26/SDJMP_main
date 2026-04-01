@@ -13,6 +13,16 @@ const skillSchema = new mongoose.Schema(
       default: 'general',
       trim: true,
     },
+    categoryLabel: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    categoryDescription: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     description: {
       type: String,
       default: '',

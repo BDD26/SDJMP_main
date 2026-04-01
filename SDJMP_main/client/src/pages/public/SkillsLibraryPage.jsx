@@ -24,35 +24,44 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { skillsAPI } from '@/services/api'
 
-const categoryConfig = {
-  frontend: {
-    name: 'Frontend Development',
-    description: 'Build beautiful and interactive user interfaces',
-    icon: Code,
-  },
-  backend: {
-    name: 'Backend Development',
-    description: 'Build robust server-side applications and APIs',
-    icon: Database,
-  },
-  cloud: {
-    name: 'Cloud & DevOps',
-    description: 'Deploy and scale applications in the cloud',
-    icon: Cloud,
-  },
-  emerging: {
-    name: 'Emerging Skills',
-    description: 'Explore fast-growing skills shaping the next job market',
-    icon: TrendingUp,
-  },
-}
-
 function toTitleCase(value) {
   return String(value || '')
     .split(/[\s_-]+/)
     .filter(Boolean)
     .map((word) => `${word[0]?.toUpperCase() || ''}${word.slice(1).toLowerCase()}`)
     .join(' ')
+}
+
+function getCategoryIcon(category) {
+  const normalizedCategory = String(category || '').toLowerCase()
+
+  if (
+    normalizedCategory.includes('cloud') ||
+    normalizedCategory.includes('devops') ||
+    normalizedCategory.includes('infra')
+  ) {
+    return Cloud
+  }
+
+  if (
+    normalizedCategory.includes('data') ||
+    normalizedCategory.includes('backend') ||
+    normalizedCategory.includes('database') ||
+    normalizedCategory.includes('api')
+  ) {
+    return Database
+  }
+
+  if (
+    normalizedCategory.includes('emerging') ||
+    normalizedCategory.includes('ai') ||
+    normalizedCategory.includes('machine') ||
+    normalizedCategory.includes('security')
+  ) {
+    return TrendingUp
+  }
+
+  return Code
 }
 
 export default function SkillsLibraryPage() {
@@ -63,6 +72,7 @@ export default function SkillsLibraryPage() {
   const [trendingSkills, setTrendingSkills] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let isMounted = true
@@ -91,7 +101,7 @@ export default function SkillsLibraryPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [reloadKey])
 
   const skillCategories = useMemo(() => {
     const grouped = new Map()
@@ -114,18 +124,28 @@ export default function SkillsLibraryPage() {
 
     return Array.from(grouped.entries())
       .map(([id, categorySkills]) => {
-        const config = categoryConfig[id]
+        const categoryMeta = categorySkills.find(
+          (skill) => skill.categoryLabel || skill.categoryDescription
+        ) || categorySkills[0] || {}
+        const icon = getCategoryIcon(id)
 
         return {
           id,
-          name: config?.name || toTitleCase(id),
-          icon: config?.icon || Code,
-          description: config?.description || 'Discover opportunities to build this skill set',
+          name: categoryMeta.categoryLabel || toTitleCase(id),
+          icon,
+          description:
+            categoryMeta.categoryDescription ||
+            `Explore ${categorySkills.length} database-driven skill record${categorySkills.length === 1 ? '' : 's'} in this category.`,
           skills: categorySkills.sort((a, b) => b.demand - a.demand || a.name.localeCompare(b.name)),
         }
       })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [skills])
+
+  const totalSkillCount = useMemo(
+    () => skillCategories.reduce((count, category) => count + category.skills.length, 0),
+    [skillCategories]
+  )
 
   useEffect(() => {
     if (selectedCategory === 'all') return
@@ -163,8 +183,12 @@ export default function SkillsLibraryPage() {
   }
 
   const retryLoad = () => {
-    window.location.reload()
+    setReloadKey((value) => value + 1)
   }
+
+  const selectedSkillTracks = Array.isArray(selectedSkill?.tracks)
+    ? selectedSkill.tracks.filter((track) => track?.title)
+    : []
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -173,8 +197,13 @@ export default function SkillsLibraryPage() {
           <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-6 text-center">Master Your Next Skill</h1>
             <p className="text-muted-foreground mb-6 text-center max-w-2xl mx-auto">
-              Explore in-demand tech skills, market trends, and curated learning paths designed to help you land your dream role.
+              Browse the skill records currently available in the database, grouped by category and enriched with their live metadata.
             </p>
+            {!isLoading && !loadError ? (
+              <p className="text-sm text-muted-foreground text-center mb-6">
+                {totalSkillCount} skill{totalSkillCount === 1 ? '' : 's'} across {skillCategories.length} categor{skillCategories.length === 1 ? 'y' : 'ies'}
+              </p>
+            ) : null}
 
             <div className="flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
@@ -269,6 +298,9 @@ export default function SkillsLibraryPage() {
                         <div>
                           <h3 className="text-2xl font-bold">{category.name}</h3>
                           <p className="text-muted-foreground">{category.description}</p>
+                          <p className="text-xs uppercase tracking-wide text-muted-foreground/80 mt-1">
+                            {category.skills.length} skill{category.skills.length === 1 ? '' : 's'}
+                          </p>
                         </div>
                       </div>
 
@@ -297,6 +329,10 @@ export default function SkillsLibraryPage() {
                                 </CardDescription>
                               </CardHeader>
                               <CardContent className="space-y-4">
+                                {skill.description ? (
+                                  <p className="text-sm text-muted-foreground line-clamp-2">{skill.description}</p>
+                                ) : null}
+
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between text-xs font-bold uppercase tracking-tighter">
                                     <span className="text-muted-foreground">Market Demand</span>
@@ -364,60 +400,64 @@ export default function SkillsLibraryPage() {
           </DialogHeader>
 
           <div className="p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Category</p>
+                <p className="mt-1 font-semibold">{toTitleCase(selectedSkill?.category || 'general')}</p>
+              </div>
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Demand</p>
+                <p className="mt-1 font-semibold">{selectedSkill?.demand ?? 0}%</p>
+              </div>
+              <div className="rounded-xl bg-muted/40 p-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Open Roles</p>
+                <p className="mt-1 font-semibold">{Number(selectedSkill?.jobs || 0).toLocaleString()}</p>
+              </div>
+            </div>
+
+            {selectedSkill?.description ? (
+              <div className="rounded-xl border bg-background p-4">
+                <h4 className="font-bold text-sm uppercase tracking-widest text-primary mb-2">Overview</h4>
+                <p className="text-sm text-muted-foreground leading-relaxed">{selectedSkill.description}</p>
+              </div>
+            ) : null}
+
             <h4 className="font-bold text-sm uppercase tracking-widest text-primary flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               Recommended Resources
             </h4>
 
             <div className="grid gap-3">
-              {(selectedSkill?.tracks || [
-                { title: `${selectedSkill?.name} Crash Course`, type: 'Video', platform: 'YouTube', link: '#' },
-                { title: `Complete ${selectedSkill?.name} Roadmap`, type: 'Guide', platform: 'Medium', link: '#' },
-                { title: `Official ${selectedSkill?.name} Docs`, type: 'Docs', platform: 'Official', link: '#' },
-              ]).map((track, i) => (
-                <a
-                  key={i}
-                  href={track.link}
-                  target={track.link && track.link !== '#' ? '_blank' : undefined}
-                  rel={track.link && track.link !== '#' ? 'noreferrer' : undefined}
-                  className="flex items-center gap-4 p-4 rounded-xl border bg-background hover:bg-muted/50 hover:border-primary/30 transition-all group/item"
-                >
-                  <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover/item:bg-primary group-hover/item:text-white transition-colors">
-                    {track.type === 'Video' ? <Youtube className="h-5 w-5" /> : <ExternalLink className="h-5 w-5" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm truncate">{track.title}</p>
-                    <p className="text-xs text-muted-foreground">{track.platform} - {track.type}</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground group-hover/item:text-primary group-hover/item:translate-x-1 transition-all" />
-                </a>
-              ))}
-            </div>
+              {selectedSkillTracks.length > 0 ? (
+                selectedSkillTracks.map((track, i) => {
+                  const hasLink = Boolean(track.link && track.link !== '#')
 
-            <div className="mt-6 p-3 sm:p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-16 sm:w-24 h-16 sm:h-24 bg-blue-200/30 blur-xl rounded-full translate-x-1/2 -translate-y-1/2 group-hover:scale-150 transition-transform duration-1000" />
-              <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-2 sm:mb-3">
-                  <Youtube className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                  <h5 className="font-bold text-blue-900 text-sm sm:text-base">Video Tutorial</h5>
+                  return (
+                    <a
+                      key={i}
+                      href={hasLink ? track.link : undefined}
+                      target={hasLink ? '_blank' : undefined}
+                      rel={hasLink ? 'noreferrer' : undefined}
+                      className="flex items-center gap-4 p-4 rounded-xl border bg-background hover:bg-muted/50 hover:border-primary/30 transition-all group/item"
+                    >
+                      <div className="h-10 w-10 rounded-lg bg-primary/5 flex items-center justify-center text-primary group-hover/item:bg-primary group-hover/item:text-white transition-colors">
+                        {track.type === 'Video' ? <Youtube className="h-5 w-5" /> : <ExternalLink className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm truncate">{track.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {track.platform || 'Unknown'} - {track.type || 'Resource'}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover/item:text-primary group-hover/item:translate-x-1 transition-all" />
+                    </a>
+                  )
+                })
+              ) : (
+                <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                  No learning resources are attached to this skill in the database yet.
                 </div>
-                <p className="text-xs sm:text-sm text-blue-700 mb-3 leading-relaxed">
-                  Watch a comprehensive video guide to master {selectedSkill?.name} from basics to advanced concepts.
-                </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full font-bold border-blue-300 text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-all text-xs sm:text-sm h-9 sm:h-10"
-                  asChild
-                >
-                  <Link to={`/course/${selectedSkill?.name?.toLowerCase()}`} onClick={() => setSelectedSkill(null)}>
-                    <Youtube className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    <span className="hidden xs:inline">View Video Tutorial</span>
-                    <span className="xs:hidden sm:inline">Video Tutorial</span>
-                    <ChevronRight className="h-2 w-2 sm:h-3 sm:w-3 ml-1 sm:ml-2" />
-                  </Link>
-                </Button>
-              </div>
+              )}
             </div>
 
             <div className="mt-6 p-3 sm:p-4 rounded-xl bg-primary text-primary-foreground relative overflow-hidden group">
