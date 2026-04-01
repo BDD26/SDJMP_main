@@ -74,3 +74,32 @@ export async function uploadResumeAsset(file, { publicId, fileName } = {}) {
     }
   }
 }
+
+export async function uploadAvatarAsset(file, { publicId, fileName } = {}) {
+  const formData = new FormData()
+  formData.append('file', file, fileName || file?.name || 'avatar')
+
+  const response = await fetch(`${env.apiBaseUrl}/upload/avatar`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  })
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}))
+    throw new Error(payload?.error || 'Avatar upload failed')
+  }
+
+  const result = await response.json()
+  const asset = result?.asset || result || {}
+
+  return {
+    fileUrl: asset.fileUrl || '',
+    filePublicId: asset.filePublicId || '',
+    bytes: asset.data?.size || file.size,
+    originalFilename: fileName || file?.name || 'avatar',
+    format: asset.format || fileName?.split('.').pop() || '',
+    resourceType: asset.data?.resourceType || 'image',
+    storageProvider: asset.storageProvider || 'local',
+  }
+}

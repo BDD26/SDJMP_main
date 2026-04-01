@@ -11,7 +11,8 @@ import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 
 const forgotPasswordSchema = z.object({
-  email: z.string().trim().email('Enter a valid email address'),
+  accountEmail: z.string().trim().email('Enter a valid account email address'),
+  deliveryEmail: z.string().trim().email('Enter a valid delivery email address').optional(),
 })
 
 export default function ForgotPasswordPage() {
@@ -25,19 +26,24 @@ export default function ForgotPasswordPage() {
   } = useForm({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
-      email: '',
+      accountEmail: '',
+      deliveryEmail: '',
     },
   })
 
-  const onSubmit = async ({ email }) => {
-    const result = await requestPasswordReset(email)
+  const onSubmit = async ({ accountEmail, deliveryEmail }) => {
+    const payload = {
+      email: accountEmail,
+      ...(deliveryEmail ? { sendToEmail: deliveryEmail } : {}),
+    }
+    const result = await requestPasswordReset(payload)
 
     if (!result.success) {
       toast.error(result.error || 'Failed to send reset link')
       return
     }
 
-    setSubmittedEmail(email)
+    setSubmittedEmail(accountEmail)
     toast.success('Password reset link sent')
   }
 
@@ -73,19 +79,35 @@ export default function ForgotPasswordPage() {
             ) : (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
                 <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium">Email Address</label>
+                  <label htmlFor="accountEmail" className="text-sm font-medium">Account Email</label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      id="email"
+                      id="accountEmail"
                       type="email"
                       autoComplete="email"
-                      placeholder="you@company.com"
+                      placeholder="account@example.com"
                       className="pl-10"
-                      {...register('email')}
+                      {...register('accountEmail')}
                     />
                   </div>
-                  {errors.email ? <p className="text-sm text-destructive">{errors.email.message}</p> : null}
+                  {errors.accountEmail ? <p className="text-sm text-destructive">{errors.accountEmail.message}</p> : null}
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="deliveryEmail" className="text-sm font-medium">Delivery Email (optional)</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="deliveryEmail"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="delivery@example.com"
+                      className="pl-10"
+                      {...register('deliveryEmail')}
+                    />
+                  </div>
+                  {errors.deliveryEmail ? <p className="text-sm text-destructive">{errors.deliveryEmail.message}</p> : null}
                 </div>
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>

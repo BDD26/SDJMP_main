@@ -160,7 +160,7 @@ export function NotificationProvider({ children }) {
       formatRelativeTime,
     ]
   )
-
+  
   return (
     <NotificationContext.Provider value={value}>
       {children}

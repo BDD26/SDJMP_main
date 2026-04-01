@@ -93,7 +93,7 @@ export async function refreshSession(req, res) {
 }
 
 export async function forgotPassword(req, res) {
-  const { email } = req.validated.body
+  const { email, sendToEmail } = req.validated.body
   const user = await User.findOne({ email }).select('+passwordResetToken +passwordResetExpiresAt')
 
   if (!user) {
@@ -110,8 +110,10 @@ export async function forgotPassword(req, res) {
   user.passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000)
   await user.save()
 
+  const deliveryEmail = sendToEmail || email
+
   try {
-    await emailService.sendPasswordResetEmail(email, resetToken, user.name)
+    await emailService.sendPasswordResetEmail(deliveryEmail, resetToken, user.name)
     
     res.status(200).json({
       message: 'Password reset link sent to your email.',
@@ -130,14 +132,32 @@ export async function forgotPassword(req, res) {
 
 export async function resetPassword(req, res) {
   const { token, newPassword } = req.validated.body
-  
+  const normalizedToken = String(token || '').trim()
+
+  if (!normalizedToken) {
+    throw createHttpError(400, 'Reset token is invalid or missing')
+  }
+
   const users = await User.find({
+    passwordResetToken: { $exists: true, $ne: null },
     passwordResetExpiresAt: { $gt: new Date() },
   }).select('+passwordResetToken +passwordResetExpiresAt')
 
   let validUser = null
   for (const user of users) {
-    if (await comparePasswordResetToken(token, user.passwordResetToken)) {
+    if (!user.passwordResetToken) {
+      continue
+    }
+
+    let isMatch = false
+    try {
+      isMatch = await comparePasswordResetToken(normalizedToken, user.passwordResetToken)
+    } catch (compareError) {
+      console.warn('Password reset token compare failed for user', user.email, compareError.message)
+      continue
+    }
+
+    if (isMatch) {
       validUser = user
       break
     }

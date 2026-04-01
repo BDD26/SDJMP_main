@@ -25,6 +25,7 @@ export const loginSchema = z.object({
 export const forgotPasswordSchema = z.object({
   body: z.object({
     email: z.string().trim().email(),
+    sendToEmail: z.string().trim().email().optional(),
   }),
   params: z.object({}).optional(),
   query: z.object({}).optional(),

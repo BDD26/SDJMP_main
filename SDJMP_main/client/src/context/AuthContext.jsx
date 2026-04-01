@@ -75,7 +75,7 @@ export function AuthProvider({ children }) {
   })
 
   const forgotPasswordMutation = useMutation({
-    mutationFn: (email) => authAPI.forgotPassword(email),
+    mutationFn: (payload) => authAPI.forgotPassword(payload),
     onSuccess() {
       setError(null)
     },
@@ -142,9 +142,10 @@ export function AuthProvider({ children }) {
     }
   }, [queryClient, updateProfileMutation, user])
 
-  const requestPasswordReset = useCallback(async (email) => {
+  const requestPasswordReset = useCallback(async (payload) => {
     try {
-      await forgotPasswordMutation.mutateAsync(email)
+      const body = typeof payload === 'string' ? { email: payload } : payload
+      await forgotPasswordMutation.mutateAsync(body)
       return { success: true }
     } catch (mutationError) {
       return { success: false, error: normalizeApiError(mutationError).message }

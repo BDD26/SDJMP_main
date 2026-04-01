@@ -312,10 +312,10 @@ export const authAPI = {
 
   logout: () => apiRequest('/auth/logout', { method: 'post' }),
 
-  forgotPassword: (email) =>
+  forgotPassword: (payload) =>
     apiRequest('/auth/forgot-password', {
       method: 'post',
-      body: { email },
+      body: payload,
     }),
 
   resetPassword: (token, newPassword) =>
@@ -341,7 +341,6 @@ export const userAPI = {
     apiRequest('/users/avatar', {
       method: 'post',
       body: formData,
-      headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
   getResumes: async () => {

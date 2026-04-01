@@ -1,7 +1,8 @@
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 import env from '../config/env.js'
 
-function hasCloudinaryConfig() {
+export function hasCloudinaryConfig() {
   return Boolean(
     env.cloudinaryCloudName &&
       env.cloudinaryApiKey &&
@@ -20,6 +21,47 @@ function signCloudinaryParams(params) {
     .createHash('sha1')
     .update(`${sorted}${env.cloudinaryApiSecret}`)
     .digest('hex')
+}
+
+export async function uploadCloudinaryImage(filePath, { folder, publicId } = {}) {
+  if (!hasCloudinaryConfig()) {
+    throw new Error('Cloudinary is not configured')
+  }
+
+  const formData = new FormData()
+  formData.append('file', fs.createReadStream(filePath))
+  if (folder) {
+    formData.append('folder', folder)
+  }
+  if (publicId) {
+    formData.append('public_id', publicId)
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000)
+  formData.append('timestamp', String(timestamp))
+
+  const paramsForSignature = { timestamp }
+  if (folder) paramsForSignature.folder = folder
+  if (publicId) paramsForSignature.public_id = publicId
+
+  const signature = signCloudinaryParams(paramsForSignature)
+  formData.append('api_key', env.cloudinaryApiKey)
+  formData.append('signature', signature)
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${env.cloudinaryCloudName}/image/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  )
+
+  const payload = await response.json()
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || `Cloudinary upload failed with status ${response.status}`)
+  }
+
+  return payload
 }
 
 export async function destroyCloudinaryRawAsset(publicId) {
