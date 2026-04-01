@@ -4,24 +4,8 @@ import { mergeSkillsIntoUserProfile, normalizeSkillPayload } from './skill-inven
 import { notifyStudentForAllPublishedJobs } from '../jobs/job-match.pipeline.js'
 import Skill from './skill.model.js'
 import { serializeSkill } from './skills.service.js'
-import { defaultSkillLibrary } from './default-skill-library.js'
-
-async function ensureDefaultSkillLibrary() {
-  await Skill.bulkWrite(
-    defaultSkillLibrary.map((skill) => ({
-      updateOne: {
-        filter: { name: skill.name },
-        update: { $setOnInsert: skill },
-        upsert: true,
-      },
-    })),
-    { ordered: false }
-  )
-}
 
 export async function getAllSkills(req, res) {
-  await ensureDefaultSkillLibrary()
-
   const skills = await Skill.find({})
     .sort({ category: 1, name: 1 })
     .lean()
@@ -30,8 +14,6 @@ export async function getAllSkills(req, res) {
 }
 
 export async function getPopularSkills(req, res) {
-  await ensureDefaultSkillLibrary()
-
   const skills = await Skill.find({})
     .sort({ growth: -1, demand: -1, popularity: -1, name: 1 })
     .limit(12)

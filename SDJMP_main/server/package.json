@@ -6,12 +6,7 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-<<<<<<< HEAD
     "seed:courses": "node seed.js"
-=======
-    "test": "node --test ./test/server.imports.test.js",
-    "seed:courses": "node seed/seedCourses.js"
->>>>>>> 8797239156b980ab763217f325956a9d3ec9b849
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
