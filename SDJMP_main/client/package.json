@@ -8,8 +8,6 @@
     "dev:full": "concurrently \"npm run dev\" \"nodemon ../server/src/server.js\"",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:watch": "vitest watch",
     "lint": "eslint ."
   },
   "dependencies": {

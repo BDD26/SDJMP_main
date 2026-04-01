@@ -175,18 +175,11 @@ export default function StudentNotifications() {
             <div className="divide-y">
               {filteredNotifications.length > 0 ? (
                 filteredNotifications.map((notification) => (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    key={notification.id}
+                  <button
+                    type="button"
+                    key={notification.id} 
                     className={`p-6 flex items-start gap-4 transition-colors hover:bg-muted/30 relative group ${!notification.read ? 'bg-primary/5' : ''}`}
                     onClick={() => !notification.read && markAsRead(notification.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        if (!notification.read) markAsRead(notification.id)
-                      }
-                    }}
                   >
                     {!notification.read && (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
@@ -229,7 +222,7 @@ export default function StudentNotifications() {
                         </Button>
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))
               ) : (
                 <div className="py-20 text-center">
