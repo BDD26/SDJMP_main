@@ -48,6 +48,13 @@ const userSchema = new mongoose.Schema(
           },
           years: { type: Number, default: 0 },
           verified: { type: Boolean, default: false },
+          sources: [
+            {
+              type: { type: String, default: 'manual' },
+              sourceId: { type: String, default: '' },
+              category: { type: String, default: '' },
+            },
+          ],
         },
       ],
       projects: [

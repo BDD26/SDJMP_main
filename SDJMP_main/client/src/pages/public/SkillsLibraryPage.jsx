@@ -24,35 +24,44 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { skillsAPI } from '@/services/api'
 
-const categoryConfig = {
-  frontend: {
-    name: 'Frontend Development',
-    description: 'Build beautiful and interactive user interfaces',
-    icon: Code,
-  },
-  backend: {
-    name: 'Backend Development',
-    description: 'Build robust server-side applications and APIs',
-    icon: Database,
-  },
-  cloud: {
-    name: 'Cloud & DevOps',
-    description: 'Deploy and scale applications in the cloud',
-    icon: Cloud,
-  },
-  emerging: {
-    name: 'Emerging Skills',
-    description: 'Explore fast-growing skills shaping the next job market',
-    icon: TrendingUp,
-  },
-}
-
 function toTitleCase(value) {
   return String(value || '')
     .split(/[\s_-]+/)
     .filter(Boolean)
     .map((word) => `${word[0]?.toUpperCase() || ''}${word.slice(1).toLowerCase()}`)
     .join(' ')
+}
+
+function getCategoryIcon(category) {
+  const normalizedCategory = String(category || '').toLowerCase()
+
+  if (
+    normalizedCategory.includes('cloud') ||
+    normalizedCategory.includes('devops') ||
+    normalizedCategory.includes('infra')
+  ) {
+    return Cloud
+  }
+
+  if (
+    normalizedCategory.includes('data') ||
+    normalizedCategory.includes('backend') ||
+    normalizedCategory.includes('database') ||
+    normalizedCategory.includes('api')
+  ) {
+    return Database
+  }
+
+  if (
+    normalizedCategory.includes('emerging') ||
+    normalizedCategory.includes('ai') ||
+    normalizedCategory.includes('machine') ||
+    normalizedCategory.includes('security')
+  ) {
+    return TrendingUp
+  }
+
+  return Code
 }
 
 export default function SkillsLibraryPage() {
@@ -63,6 +72,7 @@ export default function SkillsLibraryPage() {
   const [trendingSkills, setTrendingSkills] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     let isMounted = true
@@ -91,7 +101,7 @@ export default function SkillsLibraryPage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [reloadKey])
 
   const skillCategories = useMemo(() => {
     const grouped = new Map()
@@ -114,13 +124,18 @@ export default function SkillsLibraryPage() {
 
     return Array.from(grouped.entries())
       .map(([id, categorySkills]) => {
-        const config = categoryConfig[id]
+        const categoryMeta = categorySkills.find(
+          (skill) => skill.categoryLabel || skill.categoryDescription
+        ) || categorySkills[0] || {}
+        const icon = getCategoryIcon(id)
 
         return {
           id,
-          name: config?.name || toTitleCase(id),
-          icon: config?.icon || Code,
-          description: config?.description || 'Discover opportunities to build this skill set',
+          name: categoryMeta.categoryLabel || toTitleCase(id),
+          icon,
+          description:
+            categoryMeta.categoryDescription ||
+            `Explore ${categorySkills.length} database-driven skill record${categorySkills.length === 1 ? '' : 's'} in this category.`,
           skills: categorySkills.sort((a, b) => b.demand - a.demand || a.name.localeCompare(b.name)),
         }
       })
@@ -168,7 +183,7 @@ export default function SkillsLibraryPage() {
   }
 
   const retryLoad = () => {
-    window.location.reload()
+    setReloadKey((value) => value + 1)
   }
 
   const selectedSkillTracks = Array.isArray(selectedSkill?.tracks)

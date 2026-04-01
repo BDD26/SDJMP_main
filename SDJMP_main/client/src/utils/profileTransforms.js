@@ -11,6 +11,40 @@ function normalizeStringArray(values = []) {
     .filter(Boolean)
 }
 
+function normalizeSkillSources(sources = []) {
+  if (!Array.isArray(sources)) {
+    return []
+  }
+
+  const seen = new Set()
+
+  return sources
+    .map((source) => {
+      const type = normalizeString(source?.type).toLowerCase()
+      const sourceId = normalizeString(source?.sourceId)
+      const category = normalizeString(source?.category)
+
+      if (!type && !sourceId && !category) {
+        return null
+      }
+
+      const normalized = {
+        type: type || 'manual',
+        sourceId,
+        category,
+      }
+
+      const key = [normalized.type, normalized.sourceId.toLowerCase(), normalized.category.toLowerCase()].join('|')
+      if (seen.has(key)) {
+        return null
+      }
+
+      seen.add(key)
+      return normalized
+    })
+    .filter(Boolean)
+}
+
 function normalizeSkills(skills = []) {
   if (!Array.isArray(skills)) {
     return []
@@ -24,6 +58,7 @@ function normalizeSkills(skills = []) {
           level: 'intermediate',
           years: 0,
           verified: false,
+          sources: [],
         }
       }
 
@@ -33,6 +68,7 @@ function normalizeSkills(skills = []) {
         level: skill?.level || 'intermediate',
         years: Number.isFinite(Number(skill?.years)) ? Number(skill.years) : 0,
         verified: Boolean(skill?.verified),
+        sources: normalizeSkillSources(skill?.sources),
       }
     })
     .filter((skill) => skill.name)

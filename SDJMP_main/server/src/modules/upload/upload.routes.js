@@ -1,14 +1,27 @@
 import { Router } from 'express'
 import { requireAuth } from '../../middlewares/auth.middleware.js'
 import { asyncHandler } from '../../utils/async-handler.js'
+import fs from 'fs'
 import multer from 'multer'
 import path from 'path'
-import { createResume } from '../users/users.controller.js'
-import { createResumeSchema } from '../users/users.validation.js'
+
+const uploadDirectory = path.resolve('uploads/resumes')
+fs.mkdirSync(uploadDirectory, { recursive: true })
+
+function getRequestOrigin(req) {
+  const forwardedProto = String(req.get('x-forwarded-proto') || req.protocol || 'http')
+    .split(',')[0]
+    .trim()
+  const forwardedHost = String(req.get('x-forwarded-host') || req.get('host') || '')
+    .split(',')[0]
+    .trim()
+
+  return `${forwardedProto}://${forwardedHost}`
+}
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/resumes/')
+    cb(null, uploadDirectory)
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
@@ -41,28 +54,24 @@ uploadRouter.post('/resume', upload.single('file'), asyncHandler(async (req, res
   }
 
   try {
-    const resumeData = {
-      name: req.body.name || req.file.originalname,
-      type: 'uploaded',
-      fileUrl: `/uploads/resumes/${req.file.filename}`,
-      filePublicId: `local_${req.file.filename}`,
-      storageProvider: 'local',
-      data: {
-        mimeType: req.file.mimetype,
-        originalName: req.file.originalname,
-        size: req.file.size,
-        resourceType: 'raw',
-        storageProvider: 'local'
+    const relativeFileUrl = `/uploads/resumes/${req.file.filename}`
+    const fileUrl = new URL(relativeFileUrl, `${getRequestOrigin(req)}/`).toString()
+
+    return res.status(201).json({
+      asset: {
+        fileUrl,
+        relativeFileUrl,
+        filePublicId: `local_${req.file.filename}`,
+        storageProvider: 'local',
+        data: {
+          mimeType: req.file.mimetype,
+          originalName: req.file.originalname,
+          size: req.file.size,
+          resourceType: 'raw',
+          storageProvider: 'local'
+        }
       }
-    }
-
-    const result = await createResume({ 
-      validated: { body: resumeData }, 
-      user: req.user 
-    }, res)
-
-    // `createResume` writes the response to `res` directly.
-    return result
+    })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }

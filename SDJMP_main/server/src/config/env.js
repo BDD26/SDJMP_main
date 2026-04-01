@@ -5,6 +5,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(5000),
   CLIENT_URL: z.string().url().default('http://localhost:3000'),
+  CLIENT_URLS: z.string().optional(),
   MONGODB_URI: z.string().min(1).default('mongodb://127.0.0.1:27017/skillmatch'),
   JWT_SECRET: z.string().min(8).default('skillmatch-local-secret'),
   JWT_EXPIRES_IN: z.string().default('7d'),
@@ -33,11 +34,19 @@ const envSchema = z.object({
 })
 
 const parsedEnv = envSchema.parse(process.env)
+const clientUrls = [
+  parsedEnv.CLIENT_URL,
+  ...String(parsedEnv.CLIENT_URLS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean),
+]
 
 const env = {
   nodeEnv: parsedEnv.NODE_ENV,
   port: parsedEnv.PORT,
   clientUrl: parsedEnv.CLIENT_URL,
+  clientUrls,
   mongoUri: parsedEnv.MONGODB_URI,
   jwtSecret: parsedEnv.JWT_SECRET,
   jwtExpiresIn: parsedEnv.JWT_EXPIRES_IN,

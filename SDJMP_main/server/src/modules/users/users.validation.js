@@ -1,6 +1,11 @@
 import { z } from 'zod'
 
 const stringish = z.union([z.string(), z.number()]).transform((value) => String(value).trim())
+const skillSourceSchema = z.object({
+  type: stringish.optional(),
+  sourceId: stringish.optional(),
+  category: stringish.optional(),
+})
 
 export const updateProfileSchema = z.object({
   body: z.object({
@@ -20,6 +25,7 @@ export const updateProfileSchema = z.object({
         level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']).optional(),
         years: z.number().min(0).optional(),
         verified: z.boolean().optional(),
+        sources: z.array(skillSourceSchema).optional(),
       })).optional(),
       projects: z.array(z.object({
         id: z.union([z.string(), z.number()]).optional(),

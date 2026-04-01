@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "seed:courses": "node seed.js"
+    "seed": "node seed.js",
+    "seed:courses": "node seed.js",
+    "seed:skills": "node seed.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

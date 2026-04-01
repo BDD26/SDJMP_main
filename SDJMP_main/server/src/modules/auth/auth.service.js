@@ -31,9 +31,26 @@ export function createSessionToken(userId, role) {
   })
 }
 
-export function sessionCookieOptions() {
-  const isHttpsClient = env.clientUrl.startsWith('https://')
-  const useSecureCookie = env.isProduction || (env.cookieSecure && isHttpsClient)
+function isSecureRequest(req) {
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase()
+  const origin = String(req?.headers?.origin || '').trim()
+  const referer = String(req?.headers?.referer || '').trim()
+  const secureClientConfigured = env.clientUrls.some((clientUrl) => String(clientUrl || '').startsWith('https://'))
+
+  return Boolean(
+    req?.secure ||
+    forwardedProto === 'https' ||
+    origin.startsWith('https://') ||
+    referer.startsWith('https://') ||
+    secureClientConfigured
+  )
+}
+
+export function sessionCookieOptions(req) {
+  const useSecureCookie = env.isProduction || (env.cookieSecure && isSecureRequest(req))
 
   return {
     httpOnly: true,

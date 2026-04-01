@@ -31,7 +31,7 @@ export async function register(req, res) {
   })
 
   const token = createSessionToken(user._id, user.role)
-  res.cookie(env.cookieName, token, sessionCookieOptions())
+  res.cookie(env.cookieName, token, sessionCookieOptions(req))
 
   res.status(201).json({
     user: sanitizeUser(user),
@@ -52,7 +52,7 @@ export async function login(req, res) {
   }
 
   const token = createSessionToken(user._id, user.role)
-  res.cookie(env.cookieName, token, sessionCookieOptions())
+  res.cookie(env.cookieName, token, sessionCookieOptions(req))
 
   res.status(200).json({
     user: sanitizeUser(user),
@@ -61,7 +61,7 @@ export async function login(req, res) {
 
 export async function logout(req, res) {
   res.clearCookie(env.cookieName, {
-    ...sessionCookieOptions(),
+    ...sessionCookieOptions(req),
     maxAge: undefined,
   })
 
@@ -85,7 +85,7 @@ export async function verifySession(req, res) {
 
 export async function refreshSession(req, res) {
   const token = createSessionToken(req.user._id, req.user.role)
-  res.cookie(env.cookieName, token, sessionCookieOptions())
+  res.cookie(env.cookieName, token, sessionCookieOptions(req))
 
   res.status(200).json({
     user: sanitizeUser(req.user),

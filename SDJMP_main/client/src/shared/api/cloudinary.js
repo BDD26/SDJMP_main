@@ -62,15 +62,15 @@ export async function uploadResumeAsset(file, { publicId, fileName } = {}) {
     }
     
     const result = await response.json()
-    const serverBaseUrl = String(env.apiBaseUrl || '').replace(/\/api\/?$/i, '')
+    const asset = result?.asset || result?.resume || result || {}
     return {
-      fileUrl: `${serverBaseUrl}${result.resume.fileUrl}`,
-      filePublicId: result.resume.filePublicId,
-      bytes: result.resume.data?.size || file.size,
+      fileUrl: asset.fileUrl || '',
+      filePublicId: asset.filePublicId || '',
+      bytes: asset.data?.size || file.size,
       originalFilename: fileName || file?.name || 'resume',
-      format: fileName?.split('.').pop() || 'pdf',
-      resourceType: 'raw',
-      storageProvider: 'local',
+      format: asset.format || fileName?.split('.').pop() || 'pdf',
+      resourceType: asset.data?.resourceType || 'raw',
+      storageProvider: asset.storageProvider || 'local',
     }
   }
 }

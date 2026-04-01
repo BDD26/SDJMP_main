@@ -1,7 +1,6 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { createHttpError } from '../utils/http-error.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -35,8 +34,23 @@ export async function uploadResumeLocally(file, { publicId, fileName } = {}) {
 
 export async function deleteLocalResumeFile(filePath) {
   try {
-    if (filePath && filePath.startsWith('/uploads/resumes/')) {
-      const fullPath = path.join(__dirname, '../../../', filePath)
+    let normalizedFilePath = typeof filePath === 'string' ? filePath.trim() : ''
+    if (!normalizedFilePath) {
+      return false
+    }
+
+    try {
+      normalizedFilePath = new URL(normalizedFilePath).pathname
+    } catch {
+      normalizedFilePath = normalizedFilePath.replaceAll('\\', '/')
+    }
+
+    if (normalizedFilePath.startsWith('/api/uploads/')) {
+      normalizedFilePath = normalizedFilePath.replace('/api/uploads/', '/uploads/')
+    }
+
+    if (normalizedFilePath.startsWith('/uploads/resumes/')) {
+      const fullPath = path.join(__dirname, '../../../', normalizedFilePath.replace(/^\//, ''))
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath)
         return true

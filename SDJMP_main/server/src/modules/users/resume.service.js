@@ -314,11 +314,58 @@ export async function identifySkillsFromText(text) {
   return formattedFoundSkills
 }
 
+export async function analyzeResumeSkills(fileUrl, fileType = 'application/pdf') {
+  const result = {
+    textLength: 0,
+    matchedSkills: [],
+    matchedSkillsCount: 0,
+    error: null,
+  }
+
+  if (!fileUrl || typeof fileUrl !== 'string') {
+    result.error = 'invalid_file_url'
+    return result
+  }
+
+  const resolvedFileType = (fileType && typeof fileType === 'string' && fileType.trim())
+    ? fileType.trim()
+    : 'application/pdf'
+
+  if (!resolvedFileType.toLowerCase().includes('pdf')) {
+    result.error = 'unsupported_file_type'
+    return result
+  }
+
+  try {
+    const pdfBuffer = await getPdfBufferFromUrl(fileUrl)
+    if (!pdfBuffer) {
+      result.error = 'download_failed'
+      return result
+    }
+
+    const extractedText = await extractTextFromPdf(pdfBuffer)
+    if (!extractedText || extractedText.length < 10) {
+      result.error = 'no_text_extracted'
+      return result
+    }
+
+    const matchedSkills = await identifySkillsFromText(extractedText)
+
+    result.textLength = extractedText.length
+    result.matchedSkills = matchedSkills
+    result.matchedSkillsCount = matchedSkills.length
+    return result
+  } catch (error) {
+    result.error = error?.message || 'analysis_failed'
+    return result
+  }
+}
+
 /**
  * Main routine: Downloads a resume, parses text, extracts skills,
  * and appends them to the user's profile if they don't already exist.
  */
-export async function processResumeForUser(userId, fileUrl, fileType) {
+export async function processResumeForUser(userId, fileUrl, fileType, options = {}) {
   const result = {
     parsed: false,
     textLength: 0,
@@ -331,6 +378,8 @@ export async function processResumeForUser(userId, fileUrl, fileType) {
 
   // Validate inputs — accept both string IDs and MongoDB ObjectIds
   const userIdStr = userId ? String(userId) : ''
+  const resumeId = options?.resumeId ? String(options.resumeId) : ''
+  const sourceCategory = String(options?.sourceCategory || 'resume-parser').trim() || 'resume-parser'
   if (!userIdStr) {
     console.warn('[Resume Parser] Invalid userId provided')
     result.error = 'invalid_user_id'
@@ -400,6 +449,15 @@ export async function processResumeForUser(userId, fileUrl, fileType) {
       const mergeResult = await mergeSkillsIntoUserProfile(user, matchedSkills, {
         category: 'extracted',
         verified: false,
+        ...(resumeId
+          ? {
+              source: {
+                type: 'resume',
+                sourceId: resumeId,
+                category: sourceCategory,
+              },
+            }
+          : {}),
       })
       addedSkills = mergeResult.addedSkills || []
     }
