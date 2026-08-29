@@ -87,3 +87,5 @@ __v0_jsx-dev-runtime.ts
 .npmrc
 .v0-trash/
 next.user-config.*
+
+dist
