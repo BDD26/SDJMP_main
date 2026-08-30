@@ -22,12 +22,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false, // OPTIMIZATION: Disable sourcemaps in production (save 832KB)
-    minify: 'terser', // Ensure aggressive minification
-    terserOptions: {
-      compress: {
-        drop_console: true, // Remove console logs in production
-      },
-    },
     rollupOptions: {
       output: {
         manualChunks(id) {
